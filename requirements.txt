@@ -14,6 +14,18 @@ azure-eventhub-checkpointstoreblob==1.1.4
 azure-ai-formrecognizer==3.3.2
 azure-ai-translator==1.0.0b1
 
+# Migration Dependencies
+pyodbc==5.0.1
+teradata==17.20.0.22
+cx-Oracle==8.3.0
+psycopg2-binary==2.9.9
+PyMySQL==1.1.0
+
+# Microsoft Fabric Dependencies
+fabric-client==1.0.0
+azure-mgmt-sql==3.0.1
+azure-mgmt-powerbi==1.0.0
+
 # Performance Dependencies
 redis==5.0.1
 aioredis==2.0.1

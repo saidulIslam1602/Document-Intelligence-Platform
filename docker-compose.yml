@@ -328,6 +328,76 @@ services:
       - docintel-network
     restart: unless-stopped
 
+  # Migration Service
+  migration-service:
+    build:
+      context: .
+      dockerfile: src/services/migration-service/Dockerfile
+    container_name: docintel-migration-service
+    ports:
+      - "8009:8009"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379
+      - SQL_CONNECTION_STRING=${SQL_CONNECTION_STRING}
+      - DATA_LAKE_CONNECTION_STRING=${DATA_LAKE_CONNECTION_STRING}
+      - TERADATA_HOST=${TERADATA_HOST}
+      - TERADATA_USER=${TERADATA_USER}
+      - TERADATA_PASSWORD=${TERADATA_PASSWORD}
+      - NETEZZA_HOST=${NETEZZA_HOST}
+      - NETEZZA_USER=${NETEZZA_USER}
+      - NETEZZA_PASSWORD=${NETEZZA_PASSWORD}
+    depends_on:
+      - redis
+    networks:
+      - docintel-network
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
+  # Fabric Integration Service
+  fabric-integration:
+    build:
+      context: .
+      dockerfile: src/services/fabric-integration/Dockerfile
+    container_name: docintel-fabric-integration
+    ports:
+      - "8010:8010"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379
+      - FABRIC_WORKSPACE_ID=${FABRIC_WORKSPACE_ID}
+      - FABRIC_CAPACITY_ID=${FABRIC_CAPACITY_ID}
+      - FABRIC_REGION=${FABRIC_REGION}
+      - SUBSCRIPTION_ID=${SUBSCRIPTION_ID}
+    depends_on:
+      - redis
+    networks:
+      - docintel-network
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
+  # Demo Service
+  demo-service:
+    build:
+      context: .
+      dockerfile: src/services/demo-service/Dockerfile
+    container_name: docintel-demo-service
+    ports:
+      - "8011:8011"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379
+      - SQL_CONNECTION_STRING=${SQL_CONNECTION_STRING}
+    depends_on:
+      - redis
+    networks:
+      - docintel-network
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
 volumes:
   redis_data:
   prometheus_data:
