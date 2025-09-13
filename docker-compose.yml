@@ -1,0 +1,231 @@
+version: '3.8'
+
+services:
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: docintel-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - docintel-network
+
+  # Document Ingestion Service
+  document-ingestion:
+    build:
+      context: .
+      dockerfile: src/microservices/document-ingestion/Dockerfile
+    container_name: docintel-document-ingestion
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379
+      - STORAGE_CONNECTION_STRING=${STORAGE_CONNECTION_STRING}
+      - COSMOS_CONNECTION_STRING=${COSMOS_CONNECTION_STRING}
+      - EVENT_HUB_CONNECTION_STRING=${EVENT_HUB_CONNECTION_STRING}
+      - SERVICE_BUS_CONNECTION_STRING=${SERVICE_BUS_CONNECTION_STRING}
+    depends_on:
+      - redis
+    networks:
+      - docintel-network
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
+  # AI Processing Service
+  ai-processing:
+    build:
+      context: .
+      dockerfile: src/microservices/ai-processing/Dockerfile
+    container_name: docintel-ai-processing
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379
+      - COSMOS_CONNECTION_STRING=${COSMOS_CONNECTION_STRING}
+      - FORM_RECOGNIZER_ENDPOINT=${FORM_RECOGNIZER_ENDPOINT}
+      - FORM_RECOGNIZER_KEY=${FORM_RECOGNIZER_KEY}
+      - OPENAI_ENDPOINT=${OPENAI_ENDPOINT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_DEPLOYMENT=${OPENAI_DEPLOYMENT:-gpt-4}
+      - COGNITIVE_SEARCH_ENDPOINT=${COGNITIVE_SEARCH_ENDPOINT}
+      - COGNITIVE_SEARCH_KEY=${COGNITIVE_SEARCH_KEY}
+    depends_on:
+      - redis
+    networks:
+      - docintel-network
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
+  # Analytics Service
+  analytics:
+    build:
+      context: .
+      dockerfile: src/microservices/analytics/Dockerfile
+    container_name: docintel-analytics
+    ports:
+      - "8002:8002"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379
+      - COSMOS_CONNECTION_STRING=${COSMOS_CONNECTION_STRING}
+      - APPLICATION_INSIGHTS_CONNECTION_STRING=${APPLICATION_INSIGHTS_CONNECTION_STRING}
+    depends_on:
+      - redis
+    networks:
+      - docintel-network
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: src/microservices/api-gateway/Dockerfile
+    container_name: docintel-api-gateway
+    ports:
+      - "8003:8003"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-jwt-secret-key}
+      - KEY_VAULT_URL=${KEY_VAULT_URL}
+      - DOCUMENT_INGESTION_URL=http://document-ingestion:8000
+      - AI_PROCESSING_URL=http://ai-processing:8001
+      - ANALYTICS_URL=http://analytics:8002
+    depends_on:
+      - redis
+      - document-ingestion
+      - ai-processing
+      - analytics
+    networks:
+      - docintel-network
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: docintel-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - api-gateway
+    networks:
+      - docintel-network
+    restart: unless-stopped
+
+  # Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: docintel-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - docintel-network
+    restart: unless-stopped
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: docintel-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - docintel-network
+    restart: unless-stopped
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: docintel-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - docintel-network
+    restart: unless-stopped
+
+  # Elasticsearch for logging
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: docintel-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - docintel-network
+    restart: unless-stopped
+
+  # Kibana for log visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    container_name: docintel-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - docintel-network
+    restart: unless-stopped
+
+  # Logstash for log processing
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.8.0
+    container_name: docintel-logstash
+    volumes:
+      - ./monitoring/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    depends_on:
+      - elasticsearch
+    networks:
+      - docintel-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+
+networks:
+  docintel-network:
+    driver: bridge
