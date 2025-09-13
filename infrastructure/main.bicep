@@ -68,102 +68,113 @@ resource checkpointsContainer 'Microsoft.Storage/storageAccounts/blobServices/co
   }
 }
 
+
 // =============================================
-// COSMOS DB
+// AZURE SQL DATABASE
 // =============================================
-resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2023-09-15' = {
-  name: '${resourcePrefix}-cosmos'
+resource sqlServer 'Microsoft.Sql/servers@2023-05-01-preview' = {
+  name: '${resourcePrefix}-sqlserver'
   location: location
   tags: tags
-  kind: 'GlobalDocumentDB'
   properties: {
-    consistencyPolicy: {
-      defaultConsistencyLevel: 'Session'
-    }
-    locations: [
-      {
-        locationName: location
-        failoverPriority: 0
-        isZoneRedundant: false
-      }
-    ]
-    databaseAccountOfferType: 'Standard'
-    enableAutomaticFailover: true
-    enableMultipleWriteLocations: false
-    isVirtualNetworkFilterEnabled: false
-    virtualNetworkRules: []
-    ipRules: []
-    enableFreeTier: environment == 'dev' ? true : false
-    capabilities: [
-      {
-        name: 'EnableServerless'
-      }
-    ]
+    administratorLogin: 'sqladmin'
+    administratorLoginPassword: 'TempPassword123!'
+    version: '12.0'
+    minimalTlsVersion: '1.2'
+    publicNetworkAccess: 'Enabled'
   }
 }
 
-resource cosmosDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2023-09-15' = {
-  parent: cosmosAccount
-  name: 'documentdb'
+resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
+  parent: sqlServer
+  name: 'documentintelligence'
+  location: location
+  tags: tags
+  sku: {
+    name: environment == 'dev' ? 'Basic' : 'S2'
+    tier: environment == 'dev' ? 'Basic' : 'Standard'
+  }
   properties: {
-    resource: {
-      id: 'documentdb'
-    }
+    collation: 'SQL_Latin1_General_CP1_CI_AS'
+    maxSizeBytes: environment == 'dev' ? 2147483648 : 107374182400 // 2GB for dev, 100GB for prod
+    requestedServiceObjectiveName: environment == 'dev' ? 'Basic' : 'S2'
   }
 }
 
-// Cosmos DB containers
-resource documentsContainerCosmos 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-09-15' = {
-  parent: cosmosDatabase
-  name: 'documents'
+// SQL Server Firewall Rule
+resource sqlFirewallRule 'Microsoft.Sql/servers/firewallRules@2023-05-01-preview' = {
+  parent: sqlServer
+  name: 'AllowAzureServices'
   properties: {
-    resource: {
-      id: 'documents'
-      partitionKey: {
-        paths: ['/partition_key']
-        kind: 'Hash'
-      }
-      indexingPolicy: {
-        indexingMode: 'consistent'
-        includedPaths: [
-          {
-            path: '/*'
-          }
-        ]
-        excludedPaths: [
-          {
-            path: '/"_etag"/?'
-          }
-        ]
-      }
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
+  }
+}
+
+// =============================================
+// AZURE DATA LAKE STORAGE GEN2
+// =============================================
+resource dataLakeStorageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: '${resourcePrefix}datalake${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    accessTier: 'Hot'
+    allowBlobPublicAccess: false
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    isHnsEnabled: true // Enable hierarchical namespace for Data Lake
+    networkAcls: {
+      defaultAction: enablePublicAccess ? 'Allow' : 'Deny'
     }
   }
 }
 
-resource analyticsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-09-15' = {
-  parent: cosmosDatabase
-  name: 'analytics'
+// Data Lake containers
+resource rawDataContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: dataLakeStorageAccount::blobServices
+  name: 'raw-data'
   properties: {
-    resource: {
-      id: 'analytics'
-      partitionKey: {
-        paths: ['/partition_key']
-        kind: 'Hash'
-      }
+    publicAccess: 'None'
+    metadata: {
+      purpose: 'Raw data ingestion'
     }
   }
 }
 
-resource eventsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-09-15' = {
-  parent: cosmosDatabase
-  name: 'events'
+resource processedDataContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: dataLakeStorageAccount::blobServices
+  name: 'processed-data'
   properties: {
-    resource: {
-      id: 'events'
-      partitionKey: {
-        paths: ['/partition_key']
-        kind: 'Hash'
-      }
+    publicAccess: 'None'
+    metadata: {
+      purpose: 'Processed and transformed data'
+    }
+  }
+}
+
+resource analyticsDataContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: dataLakeStorageAccount::blobServices
+  name: 'analytics-data'
+  properties: {
+    publicAccess: 'None'
+    metadata: {
+      purpose: 'Analytics and ML training data'
+    }
+  }
+}
+
+resource dataWarehouseContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: dataLakeStorageAccount::blobServices
+  name: 'data-warehouse'
+  properties: {
+    publicAccess: 'None'
+    metadata: {
+      purpose: 'Data warehouse storage'
     }
   }
 }
@@ -237,6 +248,254 @@ resource batchProcessingQueue 'Microsoft.ServiceBus/namespaces/queues@2022-10-01
     lockDuration: 'PT5M'
     enableDeadLetteringOnMessageExpiration: true
     enableBatchedOperations: true
+  }
+}
+
+// =============================================
+// AZURE API MANAGEMENT
+// =============================================
+resource apiManagement 'Microsoft.ApiManagement/service@2023-05-01-preview' = {
+  name: '${resourcePrefix}-apim'
+  location: location
+  tags: tags
+  sku: {
+    name: environment == 'dev' ? 'Developer' : 'Standard'
+    capacity: environment == 'dev' ? 1 : 2
+  }
+  properties: {
+    publisherName: 'Document Intelligence Platform'
+    publisherEmail: 'admin@documentintelligence.com'
+    notificationSenderEmail: 'noreply@documentintelligence.com'
+    publicNetworkAccess: 'Enabled'
+    virtualNetworkType: 'None'
+    disableGateway: false
+    enableClientCertificate: false
+    natGatewayState: 'Disabled'
+    publicIpAddressId: null
+    restore: false
+    apiVersionConstraint: null
+    minApiVersion: null
+    additionalLocations: []
+    customProperties: {
+      'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10': 'false'
+      'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11': 'false'
+      'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30': 'false'
+      'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Ciphers.TripleDes168': 'false'
+      'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10': 'false'
+      'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11': 'false'
+      'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30': 'false'
+    }
+  }
+}
+
+// API Management API
+resource documentIntelligenceAPI 'Microsoft.ApiManagement/service/apis@2023-05-01-preview' = {
+  parent: apiManagement
+  name: 'document-intelligence-api'
+  properties: {
+    displayName: 'Document Intelligence API'
+    description: 'API for Document Intelligence Platform'
+    serviceUrl: 'https://${apiGatewayApp.properties.configuration.ingress.fqdn}'
+    path: 'api'
+    protocols: ['https']
+    subscriptionRequired: true
+    apiVersion: 'v1'
+    apiVersionSetId: '${apiManagement.id}/apiVersionSets/document-intelligence-versions'
+  }
+}
+
+// API Version Set
+resource apiVersionSet 'Microsoft.ApiManagement/service/apiVersionSets@2023-05-01-preview' = {
+  parent: apiManagement
+  name: 'document-intelligence-versions'
+  properties: {
+    displayName: 'Document Intelligence API Versions'
+    versioningScheme: 'Segment'
+    description: 'Version set for Document Intelligence API'
+  }
+}
+
+// API Management Operations
+resource documentUploadOperation 'Microsoft.ApiManagement/service/apis/operations@2023-05-01-preview' = {
+  parent: documentIntelligenceAPI
+  name: 'upload-document'
+  properties: {
+    displayName: 'Upload Document'
+    method: 'POST'
+    urlTemplate: '/documents/upload'
+    description: 'Upload a document for processing'
+    templateParameters: []
+    request: {
+      description: 'Document upload request'
+      queryParameters: []
+      headers: []
+      representations: [
+        {
+          contentType: 'multipart/form-data'
+          schemaId: 'document-upload-schema'
+          typeName: 'DocumentUpload'
+        }
+      ]
+    }
+    responses: [
+      {
+        statusCode: 200
+        description: 'Document uploaded successfully'
+        representations: [
+          {
+            contentType: 'application/json'
+            schemaId: 'document-upload-response-schema'
+            typeName: 'DocumentUploadResponse'
+          }
+        ]
+      }
+      {
+        statusCode: 400
+        description: 'Bad request'
+        representations: [
+          {
+            contentType: 'application/json'
+            schemaId: 'error-schema'
+            typeName: 'ErrorResponse'
+          }
+        ]
+      }
+    ]
+  }
+}
+
+// API Management Policy
+resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-05-01-preview' = {
+  parent: documentIntelligenceAPI
+  name: 'policy'
+  properties: {
+    value: '''
+    <policies>
+        <inbound>
+            <!-- Rate limiting -->
+            <rate-limit calls="100" renewal-period="60" />
+            
+            <!-- CORS -->
+            <cors allow-credentials="true">
+                <allowed-origins>
+                    <origin>*</origin>
+                </allowed-origins>
+                <allowed-methods>
+                    <method>GET</method>
+                    <method>POST</method>
+                    <method>PUT</method>
+                    <method>DELETE</method>
+                    <method>OPTIONS</method>
+                </allowed-methods>
+                <allowed-headers>
+                    <header>*</header>
+                </allowed-headers>
+            </cors>
+            
+            <!-- Authentication -->
+            <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized">
+                <openid-config url="https://login.microsoftonline.com/${config.tenant_id}/.well-known/openid_configuration" />
+                <audiences>
+                    <audience>api://document-intelligence</audience>
+                </audiences>
+                <issuers>
+                    <issuer>https://login.microsoftonline.com/${config.tenant_id}/v2.0</issuer>
+                </issuers>
+            </validate-jwt>
+            
+            <!-- Request transformation -->
+            <set-backend-service base-url="https://${apiGatewayApp.properties.configuration.ingress.fqdn}" />
+            
+            <!-- Logging -->
+            <log-to-eventhub logger-id="document-intelligence-logger">
+                @{
+                    var request = context.Request;
+                    var response = context.Response;
+                    return new JObject(
+                        new JProperty("timestamp", DateTime.UtcNow),
+                        new JProperty("requestId", context.RequestId),
+                        new JProperty("method", request.Method),
+                        new JProperty("url", request.Url.ToString()),
+                        new JProperty("statusCode", response.StatusCode),
+                        new JProperty("userId", context.User?.Identity?.Name ?? "anonymous")
+                    ).ToString();
+                }
+            </log-to-eventhub>
+        </inbound>
+        <backend>
+            <forward-request />
+        </backend>
+        <outbound>
+            <!-- Response transformation -->
+            <set-header name="X-API-Version" exists-action="override">
+                <value>v1</value>
+            </set-header>
+            
+            <!-- Caching for GET requests -->
+            <cache-lookup vary-by-developer="false" vary-by-developer-groups="false" />
+            <cache-store duration="300" />
+        </outbound>
+        <on-error>
+            <set-status code="500" reason="Internal Server Error" />
+            <set-header name="Content-Type" exists-action="override">
+                <value>application/json</value>
+            </set-header>
+            <set-body>
+                {
+                    "error": "Internal Server Error",
+                    "message": "An unexpected error occurred",
+                    "requestId": "@{context.RequestId}"
+                }
+            </set-body>
+        </on-error>
+    </policies>
+    '''
+  }
+}
+
+// API Management Logger
+resource eventHubLogger 'Microsoft.ApiManagement/service/loggers@2023-05-01-preview' = {
+  parent: apiManagement
+  name: 'document-intelligence-logger'
+  properties: {
+    loggerType: 'azureEventHub'
+    description: 'Event Hub logger for API Management'
+    credentials: {
+      name: '${eventHubNamespace.name}'
+      connectionString: eventHubNamespace.listKeys().primaryConnectionString
+    }
+  }
+}
+
+// API Management Product
+resource apiProduct 'Microsoft.ApiManagement/service/products@2023-05-01-preview' = {
+  parent: apiManagement
+  name: 'document-intelligence-product'
+  properties: {
+    displayName: 'Document Intelligence Platform'
+    description: 'Access to Document Intelligence Platform APIs'
+    terms: 'By using this API, you agree to the terms of service.'
+    subscriptionRequired: true
+    approvalRequired: false
+    subscriptionsLimit: 10
+    state: 'published'
+  }
+}
+
+// Add API to Product
+resource apiProductApi 'Microsoft.ApiManagement/service/products/apis@2023-05-01-preview' = {
+  parent: apiProduct
+  name: 'document-intelligence-api'
+}
+
+// API Management Subscription
+resource apiSubscription 'Microsoft.ApiManagement/service/subscriptions@2023-05-01-preview' = {
+  parent: apiManagement
+  name: 'document-intelligence-subscription'
+  properties: {
+    displayName: 'Document Intelligence Subscription'
+    scope: '${apiProduct.id}'
+    state: 'active'
   }
 }
 
@@ -816,12 +1075,104 @@ resource vnetSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
 }
 
 // =============================================
+// AI CHAT CONTAINER APP
+// =============================================
+resource aiChatApp 'Microsoft.App/containerApps@2023-05-01' = {
+  name: '${resourcePrefix}-ai-chat'
+  location: location
+  tags: tags
+  properties: {
+    managedEnvironmentId: containerAppsEnvironment.id
+    configuration: {
+      ingress: {
+        external: true
+        targetPort: 8004
+        allowInsecure: false
+        traffic: [
+          {
+            weight: 100
+            latestRevision: true
+          }
+        ]
+      }
+      registries: [
+        {
+          server: '${resourcePrefix}acr.azurecr.io'
+          username: '${resourcePrefix}acr'
+          passwordSecretRef: 'acr-password'
+        }
+      ]
+      secrets: [
+        {
+          name: 'acr-password'
+          value: containerRegistry.listCredentials().passwords[0].value
+        }
+        {
+          name: 'openai-api-key'
+          value: 'your-openai-api-key'
+        }
+        {
+          name: 'cognitive-search-key'
+          value: 'your-cognitive-search-key'
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'ai-chat'
+          image: '${resourcePrefix}acr.azurecr.io/ai-chat:latest'
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          env: [
+            {
+              name: 'OPENAI_API_KEY'
+              secretRef: 'openai-api-key'
+            }
+            {
+              name: 'COGNITIVE_SEARCH_KEY'
+              secretRef: 'cognitive-search-key'
+            }
+            {
+              name: 'COSMOS_CONNECTION_STRING'
+            }
+            {
+              name: 'STORAGE_CONNECTION_STRING'
+              value: storageAccount.primaryEndpoints.blob
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: environment == 'dev' ? 1 : 2
+        maxReplicas: environment == 'dev' ? 3 : 10
+        rules: [
+          {
+            name: 'http-scaling'
+            http: {
+              metadata: {
+                concurrentRequests: '50'
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+
+// =============================================
 // OUTPUTS
 // =============================================
 output storageAccountName string = storageAccount.name
 output storageAccountKey string = storageAccount.listKeys().keys[0].value
-output cosmosAccountEndpoint string = cosmosAccount.properties.documentEndpoint
-output cosmosAccountKey string = cosmosAccount.listKeys().primaryMasterKey
+output dataLakeStorageAccountName string = dataLakeStorageAccount.name
+output dataLakeStorageAccountKey string = dataLakeStorageAccount.listKeys().keys[0].value
+output sqlServerName string = sqlServer.name
+output sqlDatabaseName string = sqlDatabase.name
+output sqlConnectionString string = 'Server=tcp:${sqlServer.properties.fullyQualifiedDomainName},1433;Initial Catalog=${sqlDatabase.name};Persist Security Info=False;User ID=sqladmin;Password=TempPassword123!;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;'
 output eventHubConnectionString string = eventHubNamespace.listKeys().primaryConnectionString
 output serviceBusConnectionString string = serviceBusNamespace.listKeys().primaryConnectionString
 output formRecognizerEndpoint string = formRecognizerAccount.properties.endpoint

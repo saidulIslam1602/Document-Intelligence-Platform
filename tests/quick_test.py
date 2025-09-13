@@ -112,9 +112,10 @@ def test_project_working():
     print("✅ All components are functional")
     print("✅ Ready for Microsoft M365 Copilot Data Scientist role!")
     print("\n🚀 Next steps:")
-    print("   1. Run demo: python3 tests/demo_script.py")
-    print("   2. Deploy to Azure: ./scripts/deploy.sh")
-    print("   3. Showcase in interviews!")
+    print("   1. Start services: docker-compose up -d")
+    print("   2. Access dashboard: http://localhost:8004")
+    print("   3. Deploy to Azure: ./scripts/deploy.sh")
+    print("   4. Showcase in interviews!")
     
     return True
 

@@ -14,7 +14,6 @@ from azure.eventhub import EventHubProducerClient, EventData
 from azure.eventhub.aio import EventHubConsumerClient
 from azure.eventhub.extensions.checkpointstoreblobaio import BlobCheckpointStore
 from azure.storage.blob import BlobServiceClient
-from azure.cosmos import CosmosClient
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 from azure.mgmt.streamanalytics import StreamAnalyticsManagementClient
 from azure.mgmt.streamanalytics.models import StreamingJob, StreamingJobProperties, Sku
@@ -55,12 +54,9 @@ class StreamProcessor:
             self.config.service_bus_connection_string
         )
         
-        # Cosmos DB for storing processed data
-        self.cosmos_client = CosmosClient(
-            self.config.cosmos_endpoint,
-            self.config.cosmos_key
-        )
-        self.database = self.cosmos_client.get_database_client(self.config.cosmos_database)
+        # SQL Database for storing processed data
+        from ...shared.storage.sql_service import SQLService
+        self.sql_service = SQLService(self.config.sql_connection_string)
         
         # Processing metrics
         self.metrics = {

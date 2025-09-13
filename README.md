@@ -47,7 +47,6 @@ A production-ready, enterprise-scale document processing platform built on Micro
 ├─────────────────────────────────────────────────────────────────┤
 │  Data Storage Layer                                            │
 │  ├── Azure Blob Storage                                       │
-│  ├── Azure Cosmos DB                                          │
 │  ├── Azure SQL Database                                       │
 │  └── Azure Data Lake                                          │
 └─────────────────────────────────────────────────────────────────┘

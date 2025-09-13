@@ -38,6 +38,11 @@ class AzureConfig:
     storage_connection_string: str
     storage_account_key: str
     
+    # Data Lake Storage
+    data_lake_storage_account_name: str
+    data_lake_connection_string: str
+    data_lake_account_key: str
+    
     # AI Services
     form_recognizer_endpoint: str
     form_recognizer_key: str
@@ -47,11 +52,10 @@ class AzureConfig:
     cognitive_search_endpoint: str
     cognitive_search_key: str
     
-    # Databases
-    cosmos_endpoint: str
-    cosmos_key: str
-    cosmos_database: str
+    # Database
     sql_connection_string: str
+    sql_server_name: str
+    sql_database_name: str
     
     # Event Services
     event_hub_connection_string: str
@@ -213,6 +217,11 @@ class ConfigManager:
             storage_connection_string=os.getenv("STORAGE_CONNECTION_STRING", ""),
             storage_account_key=os.getenv("STORAGE_ACCOUNT_KEY", ""),
             
+            # Data Lake Storage
+            data_lake_storage_account_name=os.getenv("DATA_LAKE_STORAGE_ACCOUNT_NAME", ""),
+            data_lake_connection_string=os.getenv("DATA_LAKE_CONNECTION_STRING", ""),
+            data_lake_account_key=os.getenv("DATA_LAKE_ACCOUNT_KEY", ""),
+            
             # AI Services
             form_recognizer_endpoint=os.getenv("FORM_RECOGNIZER_ENDPOINT", ""),
             form_recognizer_key=os.getenv("FORM_RECOGNIZER_KEY", ""),
@@ -223,10 +232,9 @@ class ConfigManager:
             cognitive_search_key=os.getenv("COGNITIVE_SEARCH_KEY", ""),
             
             # Databases
-            cosmos_endpoint=os.getenv("COSMOS_ENDPOINT", ""),
-            cosmos_key=os.getenv("COSMOS_KEY", ""),
-            cosmos_database=os.getenv("COSMOS_DATABASE", "documentdb"),
             sql_connection_string=os.getenv("SQL_CONNECTION_STRING", ""),
+            sql_server_name=os.getenv("SQL_SERVER_NAME", ""),
+            sql_database_name=os.getenv("SQL_DATABASE_NAME", "documentintelligence"),
             
             # Event Services
             event_hub_connection_string=os.getenv("EVENT_HUB_CONNECTION_STRING", ""),

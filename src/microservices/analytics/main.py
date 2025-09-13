@@ -16,7 +16,6 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 import pandas as pd
 import numpy as np
-from azure.cosmos import CosmosClient
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 from azure.monitor.query import MetricsQueryClient
 from azure.identity import DefaultAzureCredential
@@ -26,6 +25,11 @@ from plotly.utils import PlotlyJSONEncoder
 
 from ...shared.config.settings import config_manager
 from ...shared.events.event_sourcing import EventBus
+from ...shared.storage.data_lake_service import DataLakeService
+from ...shared.storage.sql_service import SQLService
+from ...shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
+from ...shared.services.powerbi_service import powerbi_service
+from ...shared.monitoring.advanced_monitoring import monitoring_service
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -48,12 +52,14 @@ security = HTTPBearer()
 
 # Global variables
 config = config_manager.get_azure_config()
+
+# Initialize storage services
+data_lake_service = DataLakeService(config.data_lake_connection_string)
+sql_service = SQLService(config.sql_connection_string)
 event_bus = EventBus()
 logger = logging.getLogger(__name__)
 
 # Azure clients
-cosmos_client = CosmosClient(config.cosmos_endpoint, config.cosmos_key)
-database = cosmos_client.get_database_client(config.cosmos_database)
 service_bus_client = ServiceBusClient.from_connection_string(
     config.service_bus_connection_string
 )
@@ -205,7 +211,7 @@ async def get_dashboard():
                     <div><span class="status-indicator status-healthy"></span>AI Processing Service</div>
                     <div><span class="status-indicator status-healthy"></span>Analytics Service</div>
                     <div><span class="status-indicator status-healthy"></span>Event Hub</div>
-                    <div><span class="status-indicator status-healthy"></span>Cosmos DB</div>
+                    <div><span class="status-indicator status-healthy"></span>SQL Database</div>
                 </div>
             </div>
             <div class="widget">
@@ -455,23 +461,21 @@ async def generate_analytics_data(
         else:
             start_time = now - timedelta(hours=1)
         
-        # Get analytics data from Cosmos DB
-        container = database.get_container_client("analytics")
-        
-        # Query for document processing metrics
-        query = f"""
+        # Get analytics data from SQL Database
+        query = """
             SELECT 
-                c.document_type,
-                c.sentiment,
-                c.language,
-                c.processing_duration,
-                c.confidence_score,
-                c.timestamp
-            FROM c 
-            WHERE c.timestamp >= '{start_time.isoformat()}'
+                d.document_type,
+                dr.entities as sentiment,
+                'en' as language,
+                dr.processing_time as processing_duration,
+                dr.confidence,
+                d.created_at as timestamp
+            FROM documents d
+            LEFT JOIN document_results dr ON d.document_id = dr.document_id
+            WHERE d.created_at >= ?
         """
         
-        results = list(container.query_items(query, enable_cross_partition_query=True))
+        results = sql_service.execute_query(query, (start_time,))
         
         if not results:
             return {
@@ -570,18 +574,18 @@ async def calculate_performance_metrics(time_range: str) -> Dict[str, Any]:
         else:
             start_time = now - timedelta(hours=1)
         
-        # Get performance data
-        container = database.get_container_client("analytics")
-        query = f"""
+        # Get performance data from SQL Database
+        query = """
             SELECT 
-                c.processing_duration,
-                c.confidence_score,
-                c.timestamp
-            FROM c 
-            WHERE c.timestamp >= '{start_time.isoformat()}'
+                dr.processing_time as processing_duration,
+                dr.confidence as confidence_score,
+                d.created_at as timestamp
+            FROM documents d
+            LEFT JOIN document_results dr ON d.document_id = dr.document_id
+            WHERE d.created_at >= ?
         """
         
-        results = list(container.query_items(query, enable_cross_partition_query=True))
+        results = sql_service.execute_query(query, (start_time,))
         
         if not results:
             return {
@@ -624,21 +628,21 @@ async def generate_business_intelligence(time_range: str) -> Dict[str, Any]:
         else:
             start_time = now - timedelta(days=7)
         
-        # Get BI data
-        container = database.get_container_client("analytics")
-        query = f"""
+        # Get BI data from SQL Database
+        query = """
             SELECT 
-                c.document_type,
-                c.sentiment,
-                c.language,
-                c.processing_duration,
-                c.confidence_score,
-                c.timestamp
-            FROM c 
-            WHERE c.timestamp >= '{start_time.isoformat()}'
+                d.document_type,
+                dr.entities as sentiment,
+                'en' as language,
+                dr.processing_time as processing_duration,
+                dr.confidence as confidence_score,
+                d.created_at as timestamp
+            FROM documents d
+            LEFT JOIN document_results dr ON d.document_id = dr.document_id
+            WHERE d.created_at >= ?
         """
         
-        results = list(container.query_items(query, enable_cross_partition_query=True))
+        results = sql_service.execute_query(query, (start_time,))
         
         if not results:
             return {
@@ -802,11 +806,201 @@ async def broadcast_analytics_updates():
             logger.error(f"Error broadcasting analytics updates: {str(e)}")
             await asyncio.sleep(60)  # Wait longer on error
 
+# New endpoints using SQL Database and Data Lake
+@app.post("/analytics/store-metric")
+async def store_metric(
+    metric_name: str,
+    metric_value: float,
+    metadata: Optional[str] = None
+):
+    """Store an analytics metric in SQL Database"""
+    try:
+        sql_service.store_metric(metric_name, metric_value, metadata)
+        return {"message": "Metric stored successfully"}
+    except Exception as e:
+        logger.error(f"Failed to store metric: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to store metric")
+
+@app.get("/analytics/metrics")
+@cache_result(ttl=300, key_prefix="analytics_metrics")  # Cache for 5 minutes
+async def get_metrics(
+    metric_name: Optional[str] = None,
+    hours: int = 24
+):
+    """Get analytics metrics from SQL Database"""
+    try:
+        metrics = sql_service.get_metrics(metric_name, hours)
+        return {"metrics": metrics}
+    except Exception as e:
+        logger.error(f"Failed to get metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get metrics")
+
+@app.post("/analytics/store-data-lake")
+async def store_analytics_data(
+    data: Dict[str, Any],
+    file_name: str
+):
+    """Store analytics data in Data Lake"""
+    try:
+        success = data_lake_service.store_analytics_data(data, file_name)
+        if success:
+            return {"message": "Data stored in Data Lake successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to store data")
+    except Exception as e:
+        logger.error(f"Failed to store data in Data Lake: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to store data")
+
+@app.get("/analytics/data-lake/files")
+async def list_data_lake_files(file_system: str = "analytics-data"):
+    """List files in Data Lake"""
+    try:
+        files = data_lake_service.list_files(file_system)
+        return {"files": files}
+    except Exception as e:
+        logger.error(f"Failed to list files: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to list files")
+
+@app.get("/analytics/processing-jobs/{user_id}")
+async def get_user_processing_jobs(user_id: str, limit: int = 50):
+    """Get processing jobs for a user from SQL Database"""
+    try:
+        jobs = sql_service.get_user_jobs(user_id, limit)
+        return {"jobs": jobs}
+    except Exception as e:
+        logger.error(f"Failed to get user jobs: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get user jobs")
+
+# Power BI Integration endpoints
+@app.post("/analytics/powerbi/push-metrics")
+async def push_metrics_to_powerbi(metrics: List[Dict[str, Any]]):
+    """Push analytics metrics to Power BI"""
+    try:
+        success = await powerbi_service.push_document_metrics(metrics)
+        if success:
+            return {"message": "Metrics pushed to Power BI successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to push metrics to Power BI")
+    except Exception as e:
+        logger.error(f"Failed to push metrics to Power BI: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to push metrics to Power BI")
+
+@app.post("/analytics/powerbi/push-user-activity")
+async def push_user_activity_to_powerbi(activity: List[Dict[str, Any]]):
+    """Push user activity data to Power BI"""
+    try:
+        success = await powerbi_service.push_user_activity(activity)
+        if success:
+            return {"message": "User activity pushed to Power BI successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to push user activity to Power BI")
+    except Exception as e:
+        logger.error(f"Failed to push user activity to Power BI: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to push user activity to Power BI")
+
+@app.post("/analytics/powerbi/create-dataset")
+async def create_powerbi_dataset():
+    """Create Power BI dataset for document analytics"""
+    try:
+        dataset_info = await powerbi_service.create_document_analytics_dataset()
+        return {"message": "Power BI dataset created successfully", "dataset": dataset_info}
+    except Exception as e:
+        logger.error(f"Failed to create Power BI dataset: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create Power BI dataset")
+
+# Advanced Monitoring endpoints
+@app.get("/monitoring/health")
+async def get_system_health():
+    """Get comprehensive system health status"""
+    try:
+        health = await monitoring_service.get_system_health()
+        return health
+    except Exception as e:
+        logger.error(f"Failed to get system health: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get system health")
+
+@app.get("/monitoring/alerts")
+async def get_active_alerts():
+    """Get active alerts"""
+    try:
+        alerts = await monitoring_service.check_alert_conditions()
+        return {"alerts": [alert.__dict__ for alert in alerts]}
+    except Exception as e:
+        logger.error(f"Failed to get active alerts: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get active alerts")
+
+@app.post("/monitoring/alert-rules")
+async def create_alert_rule(rule: Dict[str, Any]):
+    """Create a custom alert rule"""
+    try:
+        from ...shared.monitoring.advanced_monitoring import AlertRule, AlertSeverity
+        
+        alert_rule = AlertRule(
+            name=rule["name"],
+            description=rule["description"],
+            severity=AlertSeverity(rule["severity"]),
+            metric_name=rule["metric_name"],
+            threshold=rule["threshold"],
+            operator=rule["operator"],
+            evaluation_frequency=rule["evaluation_frequency"],
+            window_size=rule["window_size"],
+            enabled=rule.get("enabled", True),
+            tags=rule.get("tags", {})
+        )
+        
+        rule_name = await monitoring_service.create_custom_alert_rule(alert_rule)
+        return {"message": f"Alert rule '{rule_name}' created successfully"}
+    except Exception as e:
+        logger.error(f"Failed to create alert rule: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create alert rule")
+
+@app.get("/monitoring/metrics")
+async def get_system_metrics(
+    metric_names: List[str] = None,
+    hours: int = 24
+):
+    """Get system metrics"""
+    try:
+        from datetime import timedelta
+        
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(hours=hours)
+        
+        # Default metrics if none specified
+        if not metric_names:
+            metric_names = [
+                "requests_total", "response_time_avg", "success_rate",
+                "memory_usage_percent", "cpu_usage_percent"
+            ]
+        
+        # This would typically query actual resource metrics
+        # For demo purposes, return simulated data
+        metrics = {}
+        for metric_name in metric_names:
+            metrics[metric_name] = {
+                "current_value": 75.5,
+                "trend": "stable",
+                "threshold": 80.0,
+                "status": "healthy"
+            }
+        
+        return {"metrics": metrics, "time_range": f"{hours} hours"}
+    except Exception as e:
+        logger.error(f"Failed to get system metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get system metrics")
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
     """Initialize service on startup"""
     logger.info("Analytics and Monitoring Service started")
+    
+    # Initialize database tables
+    try:
+        sql_service.create_tables()
+        logger.info("Database tables initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize database tables: {str(e)}")
     
     # Start background task for real-time updates
     asyncio.create_task(broadcast_analytics_updates())

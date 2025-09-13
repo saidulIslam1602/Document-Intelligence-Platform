@@ -199,7 +199,7 @@ def run_all_tests():
     
     if passed == total:
         print("🎉 Project structure is correct!")
-        print("✅ Ready to run with: python3 tests/demo_script.py")
+        print("✅ Ready to run with: docker-compose up -d")
     else:
         print("⚠️ Some issues need attention")
     

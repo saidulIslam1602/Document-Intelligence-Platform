@@ -16,13 +16,16 @@ from pydantic import BaseModel, Field
 import json
 from azure.storage.blob import BlobServiceClient
 from azure.eventhub import EventHubProducerClient
-from azure.cosmos import CosmosClient
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 
 from ...shared.config.settings import config_manager
 from ...shared.events.event_sourcing import (
     DocumentUploadedEvent, EventBus, EventType
 )
+from ...shared.storage.data_lake_service import DataLakeService
+from ...shared.storage.sql_service import SQLService
+from ...shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
+from ...shared.monitoring.performance_monitor import monitor_performance
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -48,6 +51,10 @@ config = config_manager.get_azure_config()
 event_bus = EventBus()
 logger = logging.getLogger(__name__)
 
+# Initialize storage services
+data_lake_service = DataLakeService(config.data_lake_connection_string)
+sql_service = SQLService(config.sql_connection_string)
+
 # Azure clients
 blob_service_client = BlobServiceClient.from_connection_string(
     config.storage_connection_string
@@ -56,8 +63,6 @@ event_hub_producer = EventHubProducerClient.from_connection_string(
     config.event_hub_connection_string,
     eventhub_name="document-processing"
 )
-cosmos_client = CosmosClient(config.cosmos_endpoint, config.cosmos_key)
-database = cosmos_client.get_database_client(config.cosmos_database)
 service_bus_client = ServiceBusClient.from_connection_string(
     config.service_bus_connection_string
 )
@@ -122,6 +127,7 @@ async def health_check():
 
 # Document upload endpoint
 @app.post("/documents/upload", response_model=DocumentUploadResponse)
+@monitor_performance("document_upload", {"service": "document-ingestion"})
 async def upload_document(
     file: UploadFile = File(...),
     user_id: str = Depends(get_current_user),
@@ -170,28 +176,49 @@ async def upload_document(
             lambda: blob_client.upload_blob(file_content, overwrite=True)
         )
         
-        # Create document record in Cosmos DB
+        # Create document record in SQL Database
         document_record = {
-            "id": document_id,
+            "document_id": document_id,
             "user_id": user_id,
             "file_name": file.filename,
             "file_size": file_size,
             "content_type": file.content_type,
             "blob_path": blob_name,
             "document_type": document_type,
-            "metadata": metadata or {},
-            "processing_options": processing_options or {},
-            "status": "uploaded",
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-            "partition_key": user_id
+            "metadata": json.dumps(metadata or {}),
+            "processing_options": json.dumps(processing_options or {}),
+            "status": "uploaded"
         }
         
-        container = database.get_container_client("documents")
-        await asyncio.get_event_loop().run_in_executor(
-            None, 
-            lambda: container.create_item(document_record)
-        )
+        try:
+            sql_service.store_document(document_record)
+            logger.info(f"Document {document_id} stored in SQL Database")
+        except Exception as e:
+            logger.error(f"Failed to store document in SQL Database: {str(e)}")
+            raise
+        
+        # Store processing job in SQL Database
+        try:
+            job_id = sql_service.store_processing_job(
+                user_id=user_id,
+                document_name=file.filename,
+                document_path=blob_name,
+                status="uploaded"
+            )
+            logger.info(f"Processing job {job_id} created for document {document_id}")
+        except Exception as e:
+            logger.error(f"Failed to create processing job: {str(e)}")
+        
+        # Store raw data in Data Lake for analytics
+        try:
+            data_lake_service.store_raw_data(
+                data=file_content,
+                file_name=f"{document_id}_{file.filename}",
+                content_type=file.content_type or "application/octet-stream"
+            )
+            logger.info(f"Raw data stored in Data Lake for document {document_id}")
+        except Exception as e:
+            logger.error(f"Failed to store raw data in Data Lake: {str(e)}")
         
         # Publish document uploaded event
         event = DocumentUploadedEvent(
@@ -357,6 +384,7 @@ async def get_document_status(
 
 # List user documents endpoint
 @app.get("/documents")
+@cache_result(ttl=300, key_prefix="user_documents")  # Cache for 5 minutes
 async def list_user_documents(
     user_id: str = Depends(get_current_user),
     status: Optional[str] = None,
@@ -366,28 +394,21 @@ async def list_user_documents(
 ):
     """List documents for a user with optional filtering"""
     try:
-        container = database.get_container_client("documents")
+        # Use SQL service instead of Cosmos DB
+        documents = sql_service.get_user_documents(user_id, limit + offset)
         
-        # Build query
-        query = f"SELECT * FROM c WHERE c.user_id = '{user_id}'"
+        # Apply filters
         if status:
-            query += f" AND c.status = '{status}'"
+            documents = [doc for doc in documents if doc.get('status') == status]
         if document_type:
-            query += f" AND c.document_type = '{document_type}'"
-        query += f" ORDER BY c.created_at DESC OFFSET {offset} LIMIT {limit}"
+            documents = [doc for doc in documents if doc.get('document_type') == document_type]
         
-        # Execute query
-        results = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: list(container.query_items(
-                query=query,
-                enable_cross_partition_query=True
-            ))
-        )
+        # Apply pagination
+        paginated_docs = documents[offset:offset + limit]
         
         return {
-            "documents": results,
-            "total_count": len(results),
+            "documents": paginated_docs,
+            "total_count": len(documents),
             "limit": limit,
             "offset": offset
         }
