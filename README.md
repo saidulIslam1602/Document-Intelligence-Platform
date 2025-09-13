@@ -158,9 +158,7 @@ Perfect for showcasing skills relevant to Microsoft M365 Copilot development rol
 ## 📞 Contact
 
 - **GitHub**: [@saidulIslam1602](https://github.com/saidulIslam1602)
-- **LinkedIn**: [Your LinkedIn Profile]
-- **Email**: [your.email@example.com]
+- **LinkedIn**: [https://www.linkedin.com/in/mdsaidulislam1602/]
 
----
 
 ⭐ **Star this repository if you find it helpful!**
