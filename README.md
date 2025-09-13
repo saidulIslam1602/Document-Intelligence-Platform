@@ -5,7 +5,7 @@
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-A production-ready, enterprise-scale document processing platform built on Microsoft Azure that demonstrates advanced data engineering, AI/ML capabilities, and real-time analytics specifically designed for Microsoft M365 Copilot development roles.
+A production-ready, enterprise-scale document processing platform built on Microsoft Azure that demonstrates advanced data engineering, AI/ML capabilities, and real-time analytics.
 
 ## ✨ Key Features
 
@@ -14,7 +14,7 @@ A production-ready, enterprise-scale document processing platform built on Micro
 - **🏗️ Microservices Architecture**: Azure Container Apps, Event-Driven Design
 - **🔗 M365 Integration**: Outlook, Teams, SharePoint, OneDrive
 - **🧪 A/B Testing Framework**: Microsoft-level experimentation capabilities
-- **⚡ Real-time Processing**: Sub-second response times
+- **⚡ Real-time Processing**: Sub-second response times with actual performance monitoring
 - **🔒 Enterprise Security**: Azure Key Vault, RBAC, Encryption
 - **🔄 Database Migration**: Teradata, Netezza, Oracle to Azure migration tools
 - **☁️ Microsoft Fabric**: OneLake, Data Warehouse, Real-time Intelligence
@@ -26,12 +26,12 @@ A production-ready, enterprise-scale document processing platform built on Micro
 ┌─────────────────────────────────────────────────────────────────┐
 │                    DOCUMENT INTELLIGENCE PLATFORM              │
 ├─────────────────────────────────────────────────────────────────┤
-│  Frontend Layer (React/Angular)                                │
-│  ├── Document Upload UI                                        │
+│  Web Dashboard (FastAPI + HTML)                                │
+│  ├── Document Upload Interface                                 │
 │  ├── Real-time Analytics Dashboard                            │
 │  └── AI Chat Interface                                         │
 ├─────────────────────────────────────────────────────────────────┤
-│  API Gateway Layer (Azure API Management)                      │
+│  API Gateway Layer (FastAPI)                                   │
 │  ├── Authentication & Authorization                           │
 │  ├── Rate Limiting & Throttling                               │
 │  └── Request/Response Transformation                          │
@@ -40,12 +40,14 @@ A production-ready, enterprise-scale document processing platform built on Micro
 │  ├── Document Ingestion Service                               │
 │  ├── AI Processing Service                                    │
 │  ├── Analytics Service                                        │
+│  ├── Data Quality Service                                     │
+│  ├── Batch Processor Service                                  │
 │  └── M365 Integration Service                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │  AI/ML Layer                                                   │
 │  ├── Azure OpenAI (GPT-4, Embeddings)                        │
 │  ├── Azure Cognitive Services                                 │
-│  ├── Azure Machine Learning                                   │
+│  ├── Hugging Face Models (BERT, BART, DistilBERT)            │
 │  └── Azure Cognitive Search                                   │
 ├─────────────────────────────────────────────────────────────────┤
 │  Data Storage Layer                                            │
@@ -56,14 +58,12 @@ A production-ready, enterprise-scale document processing platform built on Micro
 │  Microsoft Fabric Integration                                  │
 │  ├── OneLake (Unified Data Lake)                              │
 │  ├── Fabric Data Warehouse                                    │
-│  ├── Real-time Intelligence                                   │
-│  └── Power BI Integration                                     │
+│  └── Real-time Intelligence                                   │
 ├─────────────────────────────────────────────────────────────────┤
 │  Migration & Customer Engagement                               │
 │  ├── Database Migration Tools                                 │
 │  ├── PoC Framework                                            │
-│  ├── Demo Orchestration                                       │
-│  └── Workshop Tools                                           │
+│  └── Demo Orchestration                                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -74,7 +74,6 @@ A production-ready, enterprise-scale document processing platform built on Micro
 - Python 3.9+
 - Azure CLI 2.0+
 - Docker Desktop
-- Node.js 18+ (for frontend)
 
 ### Installation
 
@@ -90,7 +89,7 @@ cd Document-Intelligence-Platform
 ./scripts/deploy.sh
 
 # Configure environment variables
-cp .env.example .env
+cp env.example .env
 # Edit .env with your Azure credentials
 ```
 
@@ -105,11 +104,11 @@ pytest tests/
 
 ## 📊 Performance Metrics
 
-- **Throughput**: 10,000+ documents per hour
+- **Throughput**: Real-time processing with auto-scaling capabilities (2-15 replicas)
 - **Latency**: < 2 seconds for document processing
-- **Availability**: 99.9% uptime SLA
-- **Scalability**: Auto-scaling to handle peak loads
-- **Accuracy**: 95%+ document classification accuracy
+- **Availability**: High availability with comprehensive monitoring
+- **Scalability**: Azure Container Apps auto-scaling
+- **Accuracy**: AI-powered classification with confidence scoring
 
 ## 🛠️ Technology Stack
 
@@ -131,20 +130,19 @@ pytest tests/
 ### AI/ML Services
 - **Azure OpenAI**: GPT-4, embeddings, fine-tuning
 - **Azure Cognitive Services**: Form Recognizer, Translator, Content Moderator
-- **Azure Machine Learning**: Custom model training and deployment
+- **Hugging Face Models**: BERT, BART, DistilBERT for classification, summarization, Q&A
 - **Azure Cognitive Search**: Vector search and semantic search
 
 ### Storage & Databases
 - **Azure Blob Storage**: Document storage
-- **Azure SQL Database**: Transactional data
+- **Azure SQL Database**: Transactional data with real performance monitoring
 - **Azure Data Lake**: Data warehouse storage
 
 ### Migration & Customer Engagement
-- **Database Migration**: Teradata, Netezza, Oracle migration tools
+- **Database Migration**: Teradata, Netezza, Oracle migration tools with real SQL operations
 - **Schema Conversion**: Automated legacy schema to Azure SQL conversion
-- **PoC Framework**: Customer demonstration and proof-of-concept tools
+- **PoC Framework**: Customer demonstration and proof-of-concept tools with database persistence
 - **Demo Orchestration**: Interactive demo and workshop capabilities
-- **Migration Assessment**: Legacy system analysis and planning tools
 
 ## 🔄 Database Migration Capabilities
 
@@ -154,16 +152,15 @@ This platform includes comprehensive migration tools for enterprise database mod
 - **Teradata Migration**: Automated schema conversion and data migration
 - **Netezza Migration**: ETL pipelines for data warehouse migration
 - **Oracle Migration**: Database schema and stored procedure conversion
-- **Hadoop Migration**: Big data platform migration to Azure
 
 ### **Migration Features**
 - **Schema Analysis**: Automated discovery and mapping of legacy schemas
 - **Data Validation**: Comprehensive data quality checks during migration
 - **Performance Optimization**: Query optimization for Azure SQL Database
-- **Rollback Capabilities**: Safe migration with rollback procedures
+- **Real SQL Operations**: Actual database connections and query execution
 
 ### **Migration Tools**
-- **Migration Service**: Automated migration orchestration
+- **Migration Service**: Automated migration orchestration with real Azure SQL operations
 - **Schema Converter**: Legacy schema to Azure SQL conversion
 - **Data Validator**: Migration data integrity verification
 - **Performance Monitor**: Migration progress and performance tracking
@@ -176,7 +173,7 @@ Seamless integration with Microsoft Fabric for modern data platform capabilities
 - **Unified Data Lake**: Single data lake for all analytics workloads
 - **Data Sharing**: Secure data sharing across organizations
 - **Delta Lake**: ACID transactions and schema evolution
-- **Multi-format Support**: Parquet, Delta, JSON, CSV support
+- **Multi-format Support**: Parquet, Delta, JSON, CSV support with real file operations
 
 ### **Fabric Data Warehouse**
 - **Serverless SQL**: On-demand compute for data warehousing
@@ -190,12 +187,6 @@ Seamless integration with Microsoft Fabric for modern data platform capabilities
 - **Real-time Dashboards**: Live monitoring and alerting
 - **Stream Analytics**: Complex event processing
 
-### **Power BI Integration**
-- **Direct Query**: Real-time data access from Fabric
-- **Semantic Models**: Unified data model for all BI workloads
-- **Copilot Integration**: AI-powered insights and natural language queries
-- **Data Lineage**: Complete data lineage tracking
-
 ## 🎯 Customer Engagement Features
 
 Built-in tools for customer demonstrations, PoCs, and technical workshops:
@@ -204,7 +195,7 @@ Built-in tools for customer demonstrations, PoCs, and technical workshops:
 - **Quick Setup**: One-click deployment for customer demos
 - **Custom Scenarios**: Pre-built industry-specific use cases
 - **Performance Benchmarks**: Real-time performance metrics
-- **ROI Calculator**: Business value demonstration tools
+- **Database Persistence**: Actual SQL Database storage for PoC instances
 
 ### **Demo Orchestration**
 - **Interactive Demos**: Step-by-step guided demonstrations
@@ -218,11 +209,15 @@ Built-in tools for customer demonstrations, PoCs, and technical workshops:
 - **Migration Planning**: Legacy system assessment and planning tools
 - **Best Practices**: Industry-specific implementation guides
 
-### **Customer Success Features**
-- **Migration Assessment**: Automated legacy system analysis
-- **Cost Optimization**: Azure cost analysis and recommendations
-- **Security Review**: Comprehensive security assessment tools
-- **Performance Tuning**: Automated performance optimization
+## 🔧 Real Performance Monitoring
+
+The platform includes comprehensive performance monitoring with actual metrics:
+
+- **Real-time Throughput**: Calculated from actual processing events
+- **Actual Error Rates**: Based on real failed document counts
+- **System Uptime**: Calculated from system activity and start time
+- **Processing Times**: Real P95, P99 percentiles from actual data
+- **Document Type Analytics**: Real metrics per document type
 
 ## 📚 Documentation
 
@@ -249,7 +244,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 This project demonstrates:
 - **Enterprise Architecture**: Microservices, event-driven design
 - **Cloud Expertise**: Advanced Azure services usage
-- **AI/ML Skills**: Production-ready ML implementations
+- **AI/ML Skills**: Production-ready ML implementations with real models
 - **Data Engineering**: Real-time and batch processing
 - **Database Migration**: Teradata, Netezza, Oracle migration expertise
 - **Microsoft Fabric**: OneLake, Data Warehouse, Real-time Intelligence
@@ -263,6 +258,5 @@ Perfect for showcasing skills relevant to **Microsoft Cloud & AI Solution Engine
 
 - **GitHub**: [@saidulIslam1602](https://github.com/saidulIslam1602)
 - **LinkedIn**: [https://www.linkedin.com/in/mdsaidulislam1602/]
-
 
 ⭐ **Star this repository if you find it helpful!**

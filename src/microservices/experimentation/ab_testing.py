@@ -17,7 +17,7 @@ from scipy import stats
 from scipy.stats import chi2_contingency, ttest_ind, mannwhitneyu
 import plotly.graph_objects as go
 import plotly.express as px
-from azure.cosmos import CosmosClient
+# Cosmos DB removed - using Azure SQL Database
 from azure.monitor.query import MetricsQueryClient
 from azure.identity import DefaultAzureCredential
 
@@ -91,17 +91,13 @@ class AdvancedABTestingFramework:
         self.logger = logging.getLogger(__name__)
         
         # Azure clients
-        self.cosmos_client = CosmosClient(
-            self.config.cosmos_endpoint, 
-            self.config.cosmos_key
-        )
-        self.database = self.cosmos_client.get_database_client(self.config.cosmos_database)
+        # Cosmos DB removed - using Azure SQL Database for A/B testing data
+        self.sql_service = SQLService(self.config.sql_connection_string)
         self.metrics_client = MetricsQueryClient(DefaultAzureCredential())
         
-        # Experiment storage
-        self.experiments_container = self.database.get_container_client("experiments")
-        self.results_container = self.database.get_container_client("experiment_results")
-        self.events_container = self.database.get_container_client("experiment_events")
+        # A/B testing data stored in Azure SQL Database
+        self._initialize_ab_testing_tables()
+        # Event tracking through SQL Database
         
         # Active experiments cache
         self.active_experiments = {}

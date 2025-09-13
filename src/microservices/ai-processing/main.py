@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
-from azure.cosmos import CosmosClient
+# Cosmos DB removed - using Azure SQL Database
 from azure.storage.blob import BlobServiceClient
 
 from ...shared.config.settings import config_manager
@@ -24,6 +24,12 @@ from ...shared.events.event_sourcing import (
 from .openai_service import OpenAIService
 from .form_recognizer_service import FormRecognizerService
 from .ml_models import MLModelManager
+from .fine_tuning_service import DocumentFineTuningService
+from .fine_tuning_api import router as fine_tuning_router
+from .fine_tuning_workflow import DocumentFineTuningWorkflow
+from .fine_tuning_dashboard import FineTuningDashboard
+from .fine_tuning_websocket import router as fine_tuning_ws_router
+from .fine_tuning_database import initialize_fine_tuning_database
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -50,8 +56,7 @@ event_bus = EventBus()
 logger = logging.getLogger(__name__)
 
 # Azure clients
-cosmos_client = CosmosClient(config.cosmos_endpoint, config.cosmos_key)
-database = cosmos_client.get_database_client(config.cosmos_database)
+# Cosmos DB removed - using Azure SQL Database for all data storage
 blob_service_client = BlobServiceClient.from_connection_string(
     config.storage_connection_string
 )
@@ -63,6 +68,9 @@ service_bus_client = ServiceBusClient.from_connection_string(
 openai_service = OpenAIService(event_bus)
 form_recognizer_service = FormRecognizerService(event_bus)
 ml_model_manager = MLModelManager(event_bus)
+fine_tuning_service = DocumentFineTuningService(event_bus)
+fine_tuning_workflow = DocumentFineTuningWorkflow(event_bus)
+fine_tuning_dashboard = FineTuningDashboard(event_bus)
 
 # Pydantic models
 class ProcessingRequest(BaseModel):
@@ -592,11 +600,22 @@ async def publish_event(event):
     except Exception as e:
         logger.error(f"Error publishing event: {str(e)}")
 
+# Include routers
+app.include_router(fine_tuning_router)
+app.include_router(fine_tuning_ws_router)
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
     """Initialize service on startup"""
     logger.info("AI Processing Service started")
+    
+    # Initialize fine-tuning database
+    try:
+        await initialize_fine_tuning_database()
+        logger.info("Fine-tuning database initialized")
+    except Exception as e:
+        logger.warning(f"Could not initialize fine-tuning database: {str(e)}")
     
     # Load pre-trained models
     try:

@@ -4,6 +4,7 @@ Eliminates duplicate document storage logic across microservices
 """
 
 import asyncio
+import json
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -44,13 +45,12 @@ class DocumentService:
         
         # Azure clients
         from azure.storage.blob import BlobServiceClient
-        from azure.cosmos import CosmosClient
+        # Cosmos DB removed - using Azure SQL Database
         
         self.blob_service_client = BlobServiceClient.from_connection_string(
             self.config.storage_connection_string
         )
-        self.cosmos_client = CosmosClient(self.config.cosmos_endpoint, self.config.cosmos_key)
-        self.database = self.cosmos_client.get_database_client(self.config.cosmos_database)
+        # Cosmos DB removed - all data stored in Azure SQL Database
     
     async def store_document(
         self, 
@@ -99,8 +99,8 @@ class DocumentService:
                 updated_at=now
             )
             
-            # Store in Cosmos DB
-            await self._store_cosmos_metadata(document_metadata)
+        # Store metadata in Azure SQL Database
+        await self._store_sql_metadata(document_metadata)
             
             # Store processing job in SQL Database
             await self._store_sql_job(document_metadata)
@@ -118,33 +118,36 @@ class DocumentService:
             self.logger.error(f"Error storing document: {str(e)}")
             raise
     
-    async def _store_cosmos_metadata(self, metadata: DocumentMetadata):
-        """Store document metadata in Cosmos DB"""
+    async def _store_sql_metadata(self, metadata: DocumentMetadata):
+        """Store document metadata in Azure SQL Database"""
         try:
-            document_record = {
-                "id": metadata.document_id,
-                "user_id": metadata.user_id,
-                "file_name": metadata.file_name,
-                "file_size": metadata.file_size,
-                "content_type": metadata.content_type,
-                "blob_path": metadata.blob_path,
-                "document_type": metadata.document_type,
-                "metadata": metadata.metadata,
-                "processing_options": metadata.processing_options,
-                "status": metadata.status,
-                "created_at": metadata.created_at,
-                "updated_at": metadata.updated_at,
-                "partition_key": metadata.user_id
-            }
+            query = """
+            INSERT INTO documents 
+            (document_id, user_id, file_name, file_size, content_type, blob_path, 
+             document_type, metadata, processing_options, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
             
-            container = self.database.get_container_client("documents")
-            await asyncio.get_event_loop().run_in_executor(
-                None, 
-                lambda: container.create_item(document_record)
+            params = (
+                metadata.document_id,
+                metadata.user_id,
+                metadata.file_name,
+                metadata.file_size,
+                metadata.content_type,
+                metadata.blob_path,
+                metadata.document_type,
+                json.dumps(metadata.metadata) if metadata.metadata else None,
+                json.dumps(metadata.processing_options) if metadata.processing_options else None,
+                metadata.status,
+                metadata.created_at,
+                metadata.updated_at
             )
             
+            await self.sql_service.execute_non_query(query, params)
+            self.logger.info(f"Document metadata stored in SQL Database: {metadata.document_id}")
+            
         except Exception as e:
-            self.logger.error(f"Failed to store Cosmos metadata: {str(e)}")
+            self.logger.error(f"Failed to store SQL metadata: {str(e)}")
             raise
     
     async def _store_sql_job(self, metadata: DocumentMetadata):
@@ -202,8 +205,8 @@ class DocumentService:
     ):
         """Update document status across all systems"""
         try:
-            # Update Cosmos DB
-            await self._update_cosmos_status(document_id, status, error_message, processing_metadata)
+        # Update SQL Database
+        await self._update_sql_status(document_id, status, error_message, processing_metadata)
             
             # Update SQL Database
             await self._update_sql_status(document_id, status, error_message, processing_metadata)
@@ -214,37 +217,6 @@ class DocumentService:
             self.logger.error(f"Error updating document status: {str(e)}")
             raise
     
-    async def _update_cosmos_status(
-        self, 
-        document_id: str, 
-        status: str,
-        error_message: Optional[str] = None,
-        processing_metadata: Optional[Dict[str, Any]] = None
-    ):
-        """Update status in Cosmos DB"""
-        try:
-            container = self.database.get_container_client("documents")
-            
-            # Get existing document
-            document = container.read_item(item=document_id, partition_key=document_id.split('-')[0])
-            
-            # Update fields
-            document["status"] = status
-            document["updated_at"] = datetime.utcnow().isoformat()
-            
-            if error_message:
-                document["error_message"] = error_message
-            
-            if processing_metadata:
-                document["processing_metadata"] = processing_metadata
-            
-            # Save updated document
-            container.replace_item(item=document_id, body=document)
-            
-        except Exception as e:
-            self.logger.error(f"Failed to update Cosmos status: {str(e)}")
-            raise
-    
     async def _update_sql_status(
         self, 
         document_id: str, 
@@ -252,21 +224,29 @@ class DocumentService:
         error_message: Optional[str] = None,
         processing_metadata: Optional[Dict[str, Any]] = None
     ):
-        """Update status in SQL Database"""
+        """Update status in Azure SQL Database"""
         try:
-            import json
-            metadata_json = json.dumps(processing_metadata) if processing_metadata else None
+            query = """
+            UPDATE documents 
+            SET status = ?, updated_at = ?, error_message = ?, processing_metadata = ?
+            WHERE document_id = ?
+            """
             
-            self.sql_service.update_job_status(
-                job_id=document_id,
-                status=status,
-                error_message=error_message,
-                metadata=metadata_json
+            params = (
+                status,
+                datetime.utcnow(),
+                error_message,
+                json.dumps(processing_metadata) if processing_metadata else None,
+                document_id
             )
+            
+            await self.sql_service.execute_non_query(query, params)
+            self.logger.info(f"Document {document_id} status updated in SQL Database")
             
         except Exception as e:
             self.logger.error(f"Failed to update SQL status: {str(e)}")
-            # Don't raise - this is not critical
+            raise
+    
 
 # Global document service instance
 document_service = DocumentService()

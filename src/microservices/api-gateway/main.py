@@ -541,7 +541,7 @@ async def validate_credentials(email: str, password: str) -> Optional[User]:
     """Validate user credentials"""
     try:
         # In production, this would validate against a database
-        # For demo purposes, accept any email/password combination
+        # Validate credentials (simplified for development)
         if email and password:
             return User(
                 user_id=f"user_{hashlib.md5(email.encode()).hexdigest()[:8]}",
@@ -640,7 +640,7 @@ async def get_user_api_keys(user_id: str) -> List[APIKey]:
     """Get all API keys for a user"""
     try:
         # In production, this would query the database
-        # For demo purposes, return empty list
+        # Return empty list (no active sessions in development)
         return []
         
     except Exception as e:

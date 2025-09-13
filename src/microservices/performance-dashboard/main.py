@@ -53,9 +53,12 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
-            except:
+            except (WebSocketDisconnect, ConnectionClosedError, RuntimeError) as e:
                 # Remove broken connections
                 self.active_connections.remove(connection)
+                self.logger.warning(f"Removed broken WebSocket connection: {str(e)}")
+            except Exception as e:
+                self.logger.error(f"Unexpected error sending message: {str(e)}")
 
 manager = ConnectionManager()
 

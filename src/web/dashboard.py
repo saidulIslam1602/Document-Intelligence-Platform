@@ -18,6 +18,34 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+def calculate_real_throughput(documents_db: List[Any]) -> float:
+    """Calculate actual throughput based on processing times"""
+    if not documents_db:
+        return 0.0
+    
+    # Get documents from the last hour
+    one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+    recent_docs = [doc for doc in documents_db 
+                   if hasattr(doc, 'created_at') and doc.created_at >= one_hour_ago]
+    
+    if not recent_docs:
+        return 0.0
+    
+    # Calculate throughput as documents per hour
+    time_window_hours = 1.0  # Last hour
+    return len(recent_docs) / time_window_hours
+
+def calculate_error_rate(documents_db: List[Any]) -> float:
+    """Calculate actual error rate based on document status"""
+    if not documents_db:
+        return 0.0
+    
+    # Count failed documents
+    failed_docs = len([doc for doc in documents_db 
+                      if hasattr(doc, 'status') and doc.status in ['failed', 'error']])
+    
+    return (failed_docs / len(documents_db)) * 100
 import jwt
 from pydantic import BaseModel
 import aiofiles
@@ -35,7 +63,7 @@ try:
     from shared.config.settings import AppSettings
     from shared.events.event_sourcing import DocumentUploadedEvent, DocumentProcessedEvent
 except ImportError:
-    # Fallback for demo mode
+    # Fallback for development mode
     class AppSettings:
         def __init__(self):
             self.environment = "development"
@@ -51,7 +79,10 @@ except ImportError:
 
 # Load environment
 from dotenv import load_dotenv
-load_dotenv("../../local.env")  # Go up two levels from src/web
+# Load environment from project root
+import os
+env_path = os.path.join(os.path.dirname(__file__), "../../local.env")
+load_dotenv(env_path)
 
 # Initialize settings
 settings = AppSettings()
@@ -128,7 +159,7 @@ class ABTestResult(BaseModel):
     recommendation: str
     confidence_interval: List[float]
 
-# In-memory storage for demo (replace with Azure Cosmos DB in production)
+    # In-memory storage for development (replace with Azure SQL DB in production)
 documents_db: List[DocumentAnalysisResponse] = []
 analytics_cache: AnalyticsMetrics = None
 ab_tests: List[ABTestResult] = []
@@ -152,12 +183,17 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
-            except:
-                pass
+            except (WebSocketDisconnect, ConnectionClosedError, RuntimeError) as e:
+                # Remove broken connections
+                self.active_connections.remove(connection)
+                self.logger.warning(f"Removed broken WebSocket connection: {str(e)}")
+            except Exception as e:
+                # Log unexpected errors but don't remove connection
+                self.logger.error(f"Unexpected error sending message: {str(e)}")
 
 manager = ConnectionManager()
 
-# Authentication (simplified for demo)
+# Authentication (simplified for development)
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     # In production, verify JWT token with Azure AD
     return {"user_id": "demo_user", "role": "admin"}
@@ -208,7 +244,8 @@ class DocumentAIService:
             # Parse AI response (simplified)
             try:
                 analysis_data = json.loads(ai_analysis)
-            except:
+            except (json.JSONDecodeError, ValueError) as e:
+                self.logger.warning(f"Failed to parse AI analysis JSON: {str(e)}")
                 analysis_data = {
                     "document_type": "Document",
                     "entities": {"organizations": [], "dates": [], "amounts": []},
@@ -298,7 +335,9 @@ async def get_analytics():
         if total_docs > 0:
             processing_times = [doc.processing_time for doc in documents_db]
             avg_time = sum(processing_times) / len(processing_times)
-            success_rate = 100.0  # Simplified
+            # Calculate actual success rate
+            successful_docs = len([doc for doc in documents_db if doc.status == "completed"])
+            success_rate = (successful_docs / total_docs) * 100 if total_docs > 0 else 100.0
             total_cost = sum(doc.cost for doc in documents_db)
             cost_per_doc = total_cost / total_docs if total_docs > 0 else 0
             
@@ -318,8 +357,8 @@ async def get_analytics():
                 processing_time_avg=avg_time,
                 success_rate=success_rate,
                 cost_per_document=cost_per_doc,
-                throughput_per_hour=total_docs * 2,  # Simulated
-                error_rate=0.0,
+                throughput_per_hour=calculate_real_throughput(documents_db),
+                error_rate=calculate_error_rate(documents_db),
                 top_document_types=top_types,
                 user_engagement={
                     "active_users": 1,

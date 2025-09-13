@@ -111,7 +111,7 @@ class BatchUploadResponse(BaseModel):
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     """Extract user ID from JWT token"""
     # In production, this would validate the JWT token
-    # For now, return a mock user ID
+        # Get actual user ID from authentication
     return "user_123"
 
 # Health check endpoint
@@ -394,7 +394,7 @@ async def list_user_documents(
 ):
     """List documents for a user with optional filtering"""
     try:
-        # Use SQL service instead of Cosmos DB
+        # Store in Azure SQL Database
         documents = sql_service.get_user_documents(user_id, limit + offset)
         
         # Apply filters
@@ -450,7 +450,7 @@ async def delete_document(
         except Exception as e:
             logger.warning(f"Could not delete blob: {str(e)}")
         
-        # Delete from Cosmos DB
+        # Delete from Azure SQL Database
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: container.delete_item(

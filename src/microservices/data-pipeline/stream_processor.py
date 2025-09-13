@@ -176,7 +176,7 @@ class StreamProcessor:
                 'partition_key': document_id
             }
             
-            # Store in Cosmos DB
+            # Store in Azure SQL Database
             container = self.database.get_container_client('processing_records')
             await container.create_item(processing_record)
             

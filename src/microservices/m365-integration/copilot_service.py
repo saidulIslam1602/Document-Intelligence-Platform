@@ -676,23 +676,88 @@ class M365CopilotService:
     # Helper methods for model loading
     def _load_document_classifier(self):
         """Load document classification model"""
-        # In production, this would load a trained model
-        return None
+        try:
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+            import torch
+            
+            # Load a pre-trained document classification model
+            model_name = "microsoft/DialoGPT-medium"  # Using a general model for document classification
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = AutoModelForSequenceClassification.from_pretrained(
+                model_name,
+                num_labels=10,  # Adjust based on your document types
+                problem_type="single_label_classification"
+            )
+            
+            # Set to evaluation mode
+            model.eval()
+            
+            return {
+                'tokenizer': tokenizer,
+                'model': model,
+                'device': torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to load document classifier: {str(e)}")
+            return None
     
     def _load_summarization_model(self):
         """Load summarization model"""
-        # In production, this would load a trained model
-        return None
+        try:
+            from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+            
+            # Load a pre-trained summarization model
+            model_name = "facebook/bart-large-cnn"
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+            
+            return {
+                'tokenizer': tokenizer,
+                'model': model,
+                'max_length': 1024,
+                'min_length': 50
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to load summarization model: {str(e)}")
+            return None
     
     def _load_qa_model(self):
         """Load Q&A model"""
-        # In production, this would load a trained model
-        return None
+        try:
+            from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+            
+            # Load a pre-trained Q&A model
+            model_name = "distilbert-base-cased-distilled-squad"
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = AutoModelForQuestionAnswering.from_pretrained(model_name)
+            
+            return {
+                'tokenizer': tokenizer,
+                'model': model,
+                'max_length': 512
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to load Q&A model: {str(e)}")
+            return None
     
     def _load_translation_model(self):
         """Load translation model"""
-        # In production, this would load a trained model
-        return None
+        try:
+            from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+            
+            # Load a pre-trained translation model
+            model_name = "Helsinki-NLP/opus-mt-en-de"  # English to German example
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+            
+            return {
+                'tokenizer': tokenizer,
+                'model': model,
+                'max_length': 512
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to load translation model: {str(e)}")
+            return None
     
     # Additional helper methods would be implemented here
     # for document processing, content extraction, etc.

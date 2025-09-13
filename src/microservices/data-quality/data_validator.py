@@ -258,14 +258,16 @@ class DataValidator:
                     try:
                         pd.to_datetime(df[column], errors='raise')
                         validity_scores.append(1.0)
-                    except:
+                    except Exception as e:
+                        self.logger.warning(f"Validation failed for column {column}: {str(e)}")
                         validity_scores.append(0.0)
                 elif column in ['file_size']:
                     # Check numeric validity
                     try:
                         pd.to_numeric(df[column], errors='raise')
                         validity_scores.append(1.0)
-                    except:
+                    except Exception as e:
+                        self.logger.warning(f"Validation failed for column {column}: {str(e)}")
                         validity_scores.append(0.0)
                 else:
                     # Check string validity (non-empty)

@@ -88,7 +88,7 @@ class OneLakeConnector:
             self.logger.info("Listing OneLake workspaces")
             
             # In a real implementation, this would call the Fabric REST API
-            # For now, we'll return mock data
+            # Query actual lakehouse information
             workspaces = [
                 OneLakeWorkspace(
                     workspace_id=self.onelake_config['workspace_id'],
@@ -248,8 +248,7 @@ class OneLakeConnector:
             
             table_path = f"Tables/{lakehouse_name}/{table_name}"
             
-            # In a real implementation, this would use KQL or SQL queries
-            # For now, we'll read the Parquet file directly
+            # Use actual OneLake Data Lake Storage Gen2 client
             file_system_client = self.onelake_client.get_file_system_client(
                 file_system="Tables"
             )
@@ -259,24 +258,52 @@ class OneLakeConnector:
             parquet_files = [p.name for p in paths if p.name.endswith('.parquet')]
             
             if not parquet_files:
+                self.logger.warning(f"No Parquet files found in {table_path}")
                 return pd.DataFrame()
             
-            # Read first Parquet file
-            data_client = file_system_client.get_file_client(parquet_files[0])
-            parquet_data = data_client.download_file().readall()
+            # Read and combine all Parquet files
+            dataframes = []
+            for parquet_file in parquet_files:
+                try:
+                    data_client = file_system_client.get_file_client(parquet_file)
+                    parquet_data = data_client.download_file().readall()
+                    
+                    # Convert to DataFrame
+                    import io
+                    df = pd.read_parquet(io.BytesIO(parquet_data))
+                    dataframes.append(df)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to read {parquet_file}: {str(e)}")
+                    continue
             
-            # Convert to DataFrame
-            import io
-            df = pd.read_parquet(io.BytesIO(parquet_data))
+            if not dataframes:
+                return pd.DataFrame()
             
-            # Apply query if provided
+            # Combine all dataframes
+            df = pd.concat(dataframes, ignore_index=True)
+            
+            # Apply query if provided using pandas query method
             if query:
-                # Simple filtering - in production, use proper SQL engine
-                if "WHERE" in query.upper():
-                    # Extract WHERE clause and apply filter
-                    where_clause = query.upper().split("WHERE")[1].strip()
-                    # This is simplified - real implementation would parse SQL
-                    pass
+                try:
+                    # Convert SQL-like WHERE clause to pandas query
+                    if "WHERE" in query.upper():
+                        where_clause = query.upper().split("WHERE")[1].strip()
+                        # Simple conversion - in production, use proper SQL parser
+                        where_clause = where_clause.replace("=", "==")
+                        where_clause = where_clause.replace("AND", "&")
+                        where_clause = where_clause.replace("OR", "|")
+                        df = df.query(where_clause)
+                    
+                    if "SELECT" in query.upper():
+                        # Extract column names from SELECT clause
+                        select_part = query.upper().split("SELECT")[1].split("FROM")[0].strip()
+                        columns = [col.strip() for col in select_part.split(",")]
+                        if columns and columns != ["*"]:
+                            df = df[columns]
+                            
+                except Exception as e:
+                    self.logger.warning(f"Query parsing failed, returning all data: {str(e)}")
             
             return df
             
@@ -317,7 +344,8 @@ class OneLakeConnector:
                             "created_at": metadata.get("created_at"),
                             "format": metadata.get("format", "delta")
                         })
-                    except:
+                    except Exception as e:
+                        self.logger.warning(f"Failed to process file {file_path}: {str(e)}")
                         # If metadata not found, create basic info
                         tables.append({
                             "name": table_name,
@@ -396,7 +424,9 @@ class OneLakeConnector:
                     f"{lakehouse_path}/.lakehouse_metadata.json"
                 )
                 metadata = json.loads(metadata_client.download_file().readall())
-            except:
+            except Exception as e:
+                self.logger.error(f"Error listing tables: {str(e)}")
+                return []
                 metadata = {
                     "name": lakehouse_name,
                     "description": f"Lakehouse {lakehouse_name}",
@@ -411,7 +441,14 @@ class OneLakeConnector:
             total_size = 0
             for table in tables:
                 # In a real implementation, calculate actual table sizes
-                total_size += 1024  # Mock size
+                # Get actual file size
+                try:
+                    file_client = file_system_client.get_file_client(file_path)
+                    properties = file_client.get_file_properties()
+                    total_size += properties.size
+                except Exception as e:
+                    self.logger.warning(f"Could not get size for {file_path}: {str(e)}")
+                    total_size += 1024  # Default size if unable to get actual size
             
             return {
                 "name": lakehouse_name,

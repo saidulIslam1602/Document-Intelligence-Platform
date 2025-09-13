@@ -603,10 +603,7 @@ resource documentIngestionApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'acr-password'
           value: containerRegistry.listCredentials().passwords[0].value
         }
-        {
-          name: 'cosmos-connection-string'
-          value: 'AccountEndpoint=${cosmosAccount.properties.documentEndpoint};AccountKey=${cosmosAccount.listKeys().primaryMasterKey};'
-        }
+        // Cosmos DB removed - using Azure SQL Database
         {
           name: 'storage-connection-string'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
@@ -647,10 +644,7 @@ resource documentIngestionApp 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'STORAGE_CONNECTION_STRING'
               secretRef: 'storage-connection-string'
             }
-            {
-              name: 'COSMOS_CONNECTION_STRING'
-              secretRef: 'cosmos-connection-string'
-            }
+        // Cosmos DB removed - using Azure SQL Database
             {
               name: 'EVENT_HUB_CONNECTION_STRING'
               secretRef: 'event-hub-connection-string'
@@ -710,10 +704,7 @@ resource aiProcessingApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'acr-password'
           value: containerRegistry.listCredentials().passwords[0].value
         }
-        {
-          name: 'cosmos-connection-string'
-          value: 'AccountEndpoint=${cosmosAccount.properties.documentEndpoint};AccountKey=${cosmosAccount.listKeys().primaryMasterKey};'
-        }
+        // Cosmos DB removed - using Azure SQL Database
         {
           name: 'form-recognizer-endpoint'
           value: formRecognizerAccount.properties.endpoint
@@ -774,10 +765,7 @@ resource aiProcessingApp 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'COGNITIVE_SEARCH_KEY'
               secretRef: 'cognitive-search-key'
             }
-            {
-              name: 'COSMOS_CONNECTION_STRING'
-              secretRef: 'cosmos-connection-string'
-            }
+        // Cosmos DB removed - using Azure SQL Database
           ]
         }
       ]
@@ -829,10 +817,7 @@ resource analyticsApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'acr-password'
           value: containerRegistry.listCredentials().passwords[0].value
         }
-        {
-          name: 'cosmos-connection-string'
-          value: 'AccountEndpoint=${cosmosAccount.properties.documentEndpoint};AccountKey=${cosmosAccount.listKeys().primaryMasterKey};'
-        }
+        // Cosmos DB removed - using Azure SQL Database
         {
           name: 'application-insights-connection-string'
           value: applicationInsights.properties.ConnectionString
@@ -849,10 +834,7 @@ resource analyticsApp 'Microsoft.App/containerApps@2023-05-01' = {
             memory: '1Gi'
           }
           env: [
-            {
-              name: 'COSMOS_CONNECTION_STRING'
-              secretRef: 'cosmos-connection-string'
-            }
+        // Cosmos DB removed - using Azure SQL Database
             {
               name: 'APPLICATION_INSIGHTS_CONNECTION_STRING'
               secretRef: 'application-insights-connection-string'
@@ -1135,8 +1117,7 @@ resource aiChatApp 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'COGNITIVE_SEARCH_KEY'
               secretRef: 'cognitive-search-key'
             }
-            {
-              name: 'COSMOS_CONNECTION_STRING'
+        // Cosmos DB removed - using Azure SQL Database
             }
             {
               name: 'STORAGE_CONNECTION_STRING'

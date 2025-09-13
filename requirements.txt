@@ -13,29 +13,6 @@ azure-eventhub==5.11.1
 azure-eventhub-checkpointstoreblob==1.1.4
 azure-ai-formrecognizer==3.3.2
 azure-ai-translator==1.0.0b1
-
-# Migration Dependencies
-pyodbc==5.0.1
-teradata==17.20.0.22
-cx-Oracle==8.3.0
-psycopg2-binary==2.9.9
-PyMySQL==1.1.0
-
-# Microsoft Fabric Dependencies
-fabric-client==1.0.0
-azure-mgmt-sql==3.0.1
-azure-mgmt-powerbi==1.0.0
-
-# Performance Dependencies
-redis==5.0.1
-aioredis==2.0.1
-
-# Data Engineering Dependencies
-pandas==2.1.4
-numpy==1.24.3
-networkx==3.2.1
-psutil==5.9.6
-scikit-learn==1.3.2
 azure-ai-contentmoderator==1.0.0
 azure-search-documents==11.4.0
 azure-mgmt-resource==23.0.1
@@ -44,29 +21,38 @@ azure-mgmt-cosmosdb==9.3.0
 azure-mgmt-eventhub==10.1.0
 azure-mgmt-machinelearning==1.0.0
 azure-mgmt-cognitiveservices==7.0.0
-
-# Database Dependencies
-pyodbc==5.0.1
-
-# Monitoring Dependencies
+azure-mgmt-sql==3.0.1
+azure-mgmt-powerbi==1.0.0
 azure-monitor-query==1.2.0
 azure-mgmt-monitor==6.0.1
 
-# AI/ML Dependencies
-openai==1.3.0
-scikit-learn==1.3.2
+# Migration Dependencies
+pyodbc==5.0.1
+teradata==17.20.0.22
+cx-Oracle==8.3.0
+psycopg2-binary==2.9.9
+PyMySQL==1.1.0
+
+# Performance Dependencies
+redis==5.0.1
+aioredis==2.0.1
+
+# Data Engineering Dependencies
 pandas==2.1.4
 numpy==1.24.4
+networkx==3.2.1
+psutil==5.9.6
+scikit-learn==1.3.2
+polars==0.20.0
+pyarrow==14.0.1
+
+# AI/ML Dependencies
+openai==1.3.0
 scipy==1.11.4
 transformers==4.36.0
 torch==2.1.0
 tensorflow==2.15.0
-
-# Data Processing
-pandas==2.1.4
-numpy==1.24.4
-polars==0.20.0
-pyarrow==14.0.1
+tiktoken>=0.5.0
 
 # Testing
 pytest==7.4.3
@@ -78,4 +64,3 @@ httpx==0.25.2
 python-dotenv==1.0.0
 requests==2.31.0
 aiofiles==23.2.1
-asyncio==3.4.3

@@ -264,22 +264,129 @@ class NetezzaMigrator:
             raise
     
     async def _insert_batch(self, netezza_table: NetezzaTable, rows: List[tuple]):
-        """Insert a batch of rows into Azure SQL Database"""
+        """Insert a batch of rows into Azure SQL Database with actual data validation"""
         if not rows:
             return
         
-        # Build INSERT statement
-        column_names = [col['name'] for col in netezza_table.columns]
-        placeholders = ', '.join(['?' for _ in column_names])
+        try:
+            # Validate table structure exists
+            await self._ensure_table_exists(netezza_table)
+            
+            # Build INSERT statement with proper parameterized queries
+            column_names = [col['name'] for col in netezza_table.columns]
+            column_types = [col['type'] for col in netezza_table.columns]
+            
+            # Create parameterized placeholders for SQL injection prevention
+            param_placeholders = ', '.join(['?' for _ in column_names])
+            
+            insert_sql = f"""
+            INSERT INTO [{netezza_table.schema_name}].[{netezza_table.table_name}]
+            ({', '.join([f'[{name}]' for name in column_names])})
+            VALUES ({param_placeholders})
+            """
+            
+            # Validate and transform data before insertion
+            validated_rows = []
+            for row in rows:
+                validated_row = self._validate_and_transform_row(row, column_types)
+                validated_rows.append(validated_row)
+            
+            # Execute batch insert with actual data
+            await self.sql_service.execute_non_query(insert_sql, validated_rows)
+            
+            self.logger.info(f"Successfully inserted {len(validated_rows)} rows into {netezza_table.table_name}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to insert batch into {netezza_table.table_name}: {str(e)}")
+            raise
+    
+    async def _ensure_table_exists(self, netezza_table: NetezzaTable):
+        """Ensure the target table exists in Azure SQL Database"""
+        try:
+            # Check if table exists
+            check_sql = """
+            SELECT COUNT(*) as table_count
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+            """
+            
+            result = await self.sql_service.execute_query(check_sql, (netezza_table.schema_name, netezza_table.table_name))
+            
+            if result[0]['table_count'] == 0:
+                # Create table if it doesn't exist
+                await self._create_target_table(netezza_table)
+                
+        except Exception as e:
+            self.logger.error(f"Failed to ensure table exists: {str(e)}")
+            raise
+    
+    async def _create_target_table(self, netezza_table: NetezzaTable):
+        """Create the target table in Azure SQL Database"""
+        try:
+            # Build CREATE TABLE statement
+            column_definitions = []
+            for col in netezza_table.columns:
+                sql_type = self._map_netezza_to_sql_type(col['type'])
+                column_definitions.append(f"[{col['name']}] {sql_type}")
+            
+            create_sql = f"""
+            CREATE TABLE [{netezza_table.schema_name}].[{netezza_table.table_name}] (
+                {', '.join(column_definitions)}
+            )
+            """
+            
+            await self.sql_service.execute_non_query(create_sql)
+            self.logger.info(f"Created table {netezza_table.table_name}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create table: {str(e)}")
+            raise
+    
+    def _validate_and_transform_row(self, row: tuple, column_types: List[str]) -> tuple:
+        """Validate and transform row data according to column types"""
+        try:
+            validated_row = []
+            for i, (value, col_type) in enumerate(zip(row, column_types)):
+                if value is None:
+                    validated_row.append(None)
+                elif col_type in ['VARCHAR', 'CHAR', 'TEXT']:
+                    validated_row.append(str(value))
+                elif col_type in ['INTEGER', 'BIGINT', 'SMALLINT']:
+                    validated_row.append(int(value))
+                elif col_type in ['DECIMAL', 'NUMERIC', 'FLOAT', 'DOUBLE']:
+                    validated_row.append(float(value))
+                elif col_type in ['DATE']:
+                    validated_row.append(value.strftime('%Y-%m-%d') if hasattr(value, 'strftime') else str(value))
+                elif col_type in ['TIMESTAMP', 'DATETIME']:
+                    validated_row.append(value.isoformat() if hasattr(value, 'isoformat') else str(value))
+                else:
+                    validated_row.append(str(value))
+            
+            return tuple(validated_row)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to validate row data: {str(e)}")
+            raise
+    
+    def _map_netezza_to_sql_type(self, netezza_type: str) -> str:
+        """Map Netezza data types to Azure SQL Database types"""
+        type_mapping = {
+            'VARCHAR': 'NVARCHAR(MAX)',
+            'CHAR': 'NCHAR(255)',
+            'INTEGER': 'INT',
+            'BIGINT': 'BIGINT',
+            'SMALLINT': 'SMALLINT',
+            'DECIMAL': 'DECIMAL(18,2)',
+            'NUMERIC': 'NUMERIC(18,2)',
+            'FLOAT': 'FLOAT',
+            'DOUBLE': 'FLOAT',
+            'DATE': 'DATE',
+            'TIMESTAMP': 'DATETIME2',
+            'TIME': 'TIME',
+            'BOOLEAN': 'BIT'
+        }
         
-        insert_sql = f"""
-        INSERT INTO [{netezza_table.schema_name}].[{netezza_table.table_name}]
-        ({', '.join([f'[{name}]' for name in column_names])})
-        VALUES ({placeholders})
-        """
-        
-        # Execute batch insert
-        await self.sql_service.execute_non_query(insert_sql, rows)
+        return type_mapping.get(netezza_type.upper(), 'NVARCHAR(MAX)')
     
     async def create_migration_job(self, source_schema: str, target_schema: str) -> MigrationJob:
         """Create a new migration job"""

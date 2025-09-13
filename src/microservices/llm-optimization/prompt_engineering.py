@@ -430,10 +430,26 @@ class AdvancedPromptEngineering:
         try:
             filled_template = template.template
             
-            # Replace variables
+            # Replace variables with proper validation and escaping
             for var_name, var_value in variables.items():
+                # Validate variable name
+                if not var_name or not isinstance(var_name, str):
+                    raise ValueError(f"Invalid variable name: {var_name}")
+                
+                # Escape special characters in variable value
+                escaped_value = self._escape_template_value(str(var_value))
+                
+                # Replace all occurrences of the placeholder
                 placeholder = f"{{{var_name}}}"
-                filled_template = filled_template.replace(placeholder, str(var_value))
+                if placeholder in filled_template:
+                    filled_template = filled_template.replace(placeholder, escaped_value)
+                else:
+                    self.logger.warning(f"Variable '{var_name}' not found in template")
+            
+            # Validate that all placeholders have been replaced
+            remaining_placeholders = self._find_unreplaced_placeholders(filled_template)
+            if remaining_placeholders:
+                self.logger.warning(f"Unreplaced placeholders found: {remaining_placeholders}")
             
             # Add context if provided
             if context:
@@ -447,6 +463,26 @@ class AdvancedPromptEngineering:
         except Exception as e:
             self.logger.error(f"Error filling template: {str(e)}")
             raise
+    
+    def _escape_template_value(self, value: str) -> str:
+        """Escape special characters in template values"""
+        if not isinstance(value, str):
+            value = str(value)
+        
+        # Escape common special characters that could break templates
+        escaped_value = value.replace('\\', '\\\\')  # Escape backslashes
+        escaped_value = escaped_value.replace('\n', '\\n')  # Escape newlines
+        escaped_value = escaped_value.replace('\r', '\\r')  # Escape carriage returns
+        escaped_value = escaped_value.replace('\t', '\\t')  # Escape tabs
+        
+        return escaped_value
+    
+    def _find_unreplaced_placeholders(self, template: str) -> List[str]:
+        """Find unreplaced placeholders in template"""
+        import re
+        pattern = r'\{[^}]+\}'
+        placeholders = re.findall(pattern, template)
+        return list(set(placeholders))  # Remove duplicates
     
     async def _generate_llm_response(self, prompt: str, template: PromptTemplate) -> str:
         """Generate response using LLM"""

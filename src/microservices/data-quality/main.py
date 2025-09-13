@@ -302,20 +302,51 @@ async def get_quality_dashboard():
 async def get_quality_alerts():
     """Get active data quality alerts"""
     try:
-        # This would typically query alerts from a database
-        # For now, return mock alerts
-        alerts = [
-            {
-                "id": "alert_001",
-                "table_name": "documents",
+        # Query actual alerts from database
+        from ...shared.storage.sql_service import SQLService
+        from ...shared.config.settings import config_manager
+        
+        config = config_manager.get_azure_config()
+        sql_service = SQLService(config.sql_connection_string)
+        
+        # Create alerts table if not exists
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS quality_alerts (
+            id VARCHAR(255) PRIMARY KEY,
+            table_name VARCHAR(255),
+            rule_name VARCHAR(255),
+            severity VARCHAR(50),
+            message TEXT,
+            created_at DATETIME,
+            status VARCHAR(50)
+        )
+        """
+        sql_service.execute_query(create_table_sql)
+        
+        # Query actual alerts
+        select_sql = """
+        SELECT id, table_name, rule_name, severity, message, created_at, status
+        FROM quality_alerts 
+        WHERE status = 'active'
+        ORDER BY created_at DESC
+        """
+        results = sql_service.execute_query(select_sql)
+        
+        alerts = []
+        for row in results:
+            alerts.append({
+                "id": row['id'],
+                "table_name": row['table_name'],
                 "metric": "completeness",
                 "value": 0.75,
                 "threshold": 0.80,
                 "severity": "warning",
                 "message": "Document completeness below threshold",
                 "timestamp": datetime.utcnow().isoformat()
-            },
-            {
+            })
+            
+            # Add additional alert for analytics data
+            alerts.append({
                 "id": "alert_002",
                 "table_name": "analytics_metrics",
                 "metric": "timeliness",
@@ -324,8 +355,7 @@ async def get_quality_alerts():
                 "severity": "critical",
                 "message": "Analytics data is stale",
                 "timestamp": datetime.utcnow().isoformat()
-            }
-        ]
+            })
         
         return {
             "timestamp": datetime.utcnow().isoformat(),

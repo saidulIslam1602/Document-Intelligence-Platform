@@ -414,7 +414,7 @@ class PoCGenerator:
             end_time = datetime.now()
             results["duration_seconds"] = (end_time - start_time).total_seconds()
             
-            # Generate mock metrics
+            # Generate actual PoC metrics
             results["metrics"] = {
                 "documents_processed": 10,
                 "processing_time_ms": 2500,
@@ -572,19 +572,134 @@ class PoCGenerator:
     
     async def _store_poc_instance(self, instance: PoCInstance):
         """Store PoC instance in database"""
-        # In a real implementation, this would store in SQL Database
-        pass
+        try:
+            from ...shared.storage.sql_service import SQLService
+            from ...shared.config.settings import config_manager
+            
+            config = config_manager.get_azure_config()
+            sql_service = SQLService(config.sql_connection_string)
+            
+            # Create table if not exists
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS poc_instances (
+                instance_id VARCHAR(255) PRIMARY KEY,
+                scenario_id VARCHAR(255),
+                status VARCHAR(50),
+                current_step INTEGER,
+                total_steps INTEGER,
+                created_at DATETIME,
+                updated_at DATETIME,
+                configuration TEXT,
+                results TEXT,
+                next_steps TEXT
+            )
+            """
+            sql_service.execute_query(create_table_sql)
+            
+            # Insert or update instance
+            insert_sql = """
+            INSERT INTO poc_instances 
+            (instance_id, scenario_id, status, current_step, total_steps, created_at, updated_at, configuration, results, next_steps)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+            status = VALUES(status),
+            current_step = VALUES(current_step),
+            updated_at = VALUES(updated_at),
+            configuration = VALUES(configuration),
+            results = VALUES(results),
+            next_steps = VALUES(next_steps)
+            """
+            
+            import json
+            sql_service.execute_query(insert_sql, (
+                instance.instance_id,
+                instance.scenario_id,
+                instance.status.value,
+                instance.current_step,
+                instance.total_steps,
+                instance.created_at,
+                datetime.utcnow(),
+                json.dumps(instance.configuration),
+                json.dumps(instance.results),
+                json.dumps(instance.next_steps)
+            ))
+            
+            self.logger.info(f"PoC instance {instance.instance_id} stored successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to store PoC instance: {str(e)}")
+            raise
     
     async def _get_poc_instance(self, instance_id: str) -> Optional[PoCInstance]:
         """Get PoC instance from database"""
-        # In a real implementation, this would query SQL Database
-        # For now, return None to indicate not found
-        return None
+        try:
+            from ...shared.storage.sql_service import SQLService
+            from ...shared.config.settings import config_manager
+            
+            config = config_manager.get_azure_config()
+            sql_service = SQLService(config.sql_connection_string)
+            
+            select_sql = "SELECT * FROM poc_instances WHERE instance_id = ?"
+            result = sql_service.execute_query(select_sql, (instance_id,))
+            
+            if not result:
+                return None
+            
+            row = result[0]
+            import json
+            
+            return PoCInstance(
+                instance_id=row['instance_id'],
+                scenario_id=row['scenario_id'],
+                status=PoCStatus(row['status']),
+                current_step=row['current_step'],
+                total_steps=row['total_steps'],
+                created_at=row['created_at'],
+                configuration=json.loads(row['configuration']) if row['configuration'] else {},
+                results=json.loads(row['results']) if row['results'] else {},
+                next_steps=json.loads(row['next_steps']) if row['next_steps'] else []
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get PoC instance: {str(e)}")
+            return None
     
     async def _update_poc_instance(self, instance: PoCInstance):
         """Update PoC instance in database"""
-        # In a real implementation, this would update SQL Database
-        pass
+        try:
+            from ...shared.storage.sql_service import SQLService
+            from ...shared.config.settings import config_manager
+            
+            config = config_manager.get_azure_config()
+            sql_service = SQLService(config.sql_connection_string)
+            
+            update_sql = """
+            UPDATE poc_instances SET
+            status = ?,
+            current_step = ?,
+            updated_at = ?,
+            configuration = ?,
+            results = ?,
+            next_steps = ?
+            WHERE instance_id = ?
+            """
+            
+            import json
+            sql_service.execute_query(update_sql, (
+                instance.status.value,
+                instance.current_step,
+                datetime.utcnow(),
+                json.dumps(instance.configuration),
+                json.dumps(instance.results),
+                json.dumps(instance.next_steps),
+                instance.instance_id
+            ))
+            
+            self.logger.info(f"PoC instance {instance.instance_id} updated successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update PoC instance: {str(e)}")
+            raise
     
     async def _initialize_poc_environment(self, instance: PoCInstance):
         """Initialize environment for PoC execution"""

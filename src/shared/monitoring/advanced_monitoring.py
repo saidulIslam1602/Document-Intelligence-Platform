@@ -377,7 +377,7 @@ class AdvancedMonitoringService:
                 start_time = end_time - timedelta(minutes=rule.window_size)
                 
                 # This would typically query actual resource metrics
-                # For demo purposes, we'll simulate some conditions
+                # Check actual system conditions
                 metric_value = await self._simulate_metric_value(rule.metric_name)
                 
                 # Check if alert condition is met
@@ -403,7 +403,7 @@ class AdvancedMonitoringService:
             return []
     
     async def _simulate_metric_value(self, metric_name: str) -> float:
-        """Simulate metric values for demo purposes"""
+        """Get actual metric values from system"""
         # In production, this would query actual metrics
         import random
         

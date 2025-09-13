@@ -22,8 +22,12 @@ from ...shared.storage.sql_service import SQLService
 from ...shared.auth.auth_service import get_current_user_id, User
 from ...shared.utils.error_handler import handle_validation_error, ErrorHandler
 from ...shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
-from ...microservices.ai-processing.openai_service import OpenAIService
-from ...microservices.ai-processing.form_recognizer_service import FormRecognizerService
+# Import AI processing services
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+from microservices.ai_processing.openai_service import OpenAIService
+from microservices.ai_processing.form_recognizer_service import FormRecognizerService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -85,9 +89,13 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
-            except:
+            except (WebSocketDisconnect, ConnectionClosedError, RuntimeError) as e:
                 # Remove broken connections
                 self.active_connections.remove(connection)
+                self.logger.warning(f"Removed broken WebSocket connection: {str(e)}")
+            except Exception as e:
+                # Log unexpected errors but don't remove connection
+                self.logger.error(f"Unexpected error sending message: {str(e)}")
 
 manager = ConnectionManager()
 
@@ -462,9 +470,10 @@ async def save_conversation_message(
                     None,
                     lambda: sql_service.store_conversation(conversation_data)
                 )
-        
+        except Exception as e:
+            logger.error(f"Error saving conversation message: {str(e)}")
     except Exception as e:
-        logger.error(f"Error saving conversation message: {str(e)}")
+        logger.error(f"Error in save_conversation_message: {str(e)}")
 
 # Health check endpoint
 @app.get("/health")

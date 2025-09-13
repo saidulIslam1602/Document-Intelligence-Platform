@@ -568,8 +568,8 @@ class SchemaConverter:
             # Create container if it doesn't exist
             try:
                 blob_client.create_container(container_name)
-            except:
-                pass  # Container already exists
+            except Exception as e:
+                self.logger.info(f"Container {container_name} already exists or creation failed: {str(e)}")
             
             # Upload the DDL
             blob_client = blob_client.get_blob_client(

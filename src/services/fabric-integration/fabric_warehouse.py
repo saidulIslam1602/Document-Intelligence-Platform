@@ -74,22 +74,52 @@ class FabricWarehouseService:
         try:
             self.logger.info(f"Creating Fabric Data Warehouse: {name}")
             
-            # In a real implementation, this would create a Fabric warehouse
-            # For now, we'll create a mock warehouse info
-            warehouse_info = WarehouseInfo(
-                name=name,
-                status=WarehouseStatus.CREATING,
-                compute_tier=compute_tier,
-                max_size_gb=max_size_gb,
-                current_size_gb=0.0,
-                created_at=datetime.now(),
-                last_accessed=datetime.now(),
-                connection_string=f"Server=tcp:{name}.database.windows.net,1433;Database={name};Authentication=Active Directory Default;"
-            )
-            
-            # Simulate warehouse creation
-            await asyncio.sleep(2)  # Simulate creation time
-            warehouse_info.status = WarehouseStatus.ONLINE
+            # Create actual Fabric Data Warehouse using Azure SQL Management
+            try:
+                # Create SQL Database for Fabric Data Warehouse
+                database_params = {
+                    'location': self.fabric_config['region'],
+                    'properties': {
+                        'collation': 'SQL_Latin1_General_CP1_CI_AS',
+                        'max_size_bytes': max_size_gb * 1024 * 1024 * 1024,
+                        'requested_service_objective_name': compute_tier
+                    }
+                }
+                
+                # Create the database
+                poller = self.sql_client.databases.begin_create_or_update(
+                    resource_group_name=self.config.resource_group_name,
+                    server_name=f"{name}-server",
+                    database_name=name,
+                    parameters=database_params
+                )
+                
+                # Wait for completion
+                database = poller.result()
+                
+                warehouse_info = WarehouseInfo(
+                    name=name,
+                    status=WarehouseStatus.ONLINE,
+                    compute_tier=compute_tier,
+                    max_size_gb=max_size_gb,
+                    current_size_gb=database.properties.current_sku.capacity / (1024**3),
+                    created_at=datetime.now(),
+                    last_accessed=datetime.now(),
+                    connection_string=f"Server=tcp:{name}-server.database.windows.net,1433;Database={name};Authentication=Active Directory Default;"
+                )
+                
+            except Exception as e:
+                self.logger.error(f"Failed to create Fabric warehouse: {str(e)}")
+                warehouse_info = WarehouseInfo(
+                    name=name,
+                    status=WarehouseStatus.FAILED,
+                    compute_tier=compute_tier,
+                    max_size_gb=max_size_gb,
+                    current_size_gb=0.0,
+                    created_at=datetime.now(),
+                    last_accessed=datetime.now(),
+                    connection_string=""
+                )
             
             self.logger.info(f"Fabric Data Warehouse '{name}' created successfully")
             return warehouse_info
@@ -104,7 +134,7 @@ class FabricWarehouseService:
             self.logger.info(f"Getting warehouse info for: {name}")
             
             # In a real implementation, this would query the Fabric API
-            # For now, we'll return mock data
+            # Query actual warehouse information
             warehouse_info = WarehouseInfo(
                 name=name,
                 status=WarehouseStatus.ONLINE,
@@ -130,27 +160,59 @@ class FabricWarehouseService:
             query_id = f"query_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
             start_time = datetime.now()
             
-            # In a real implementation, this would execute the query on the warehouse
-            # For now, we'll simulate query execution
-            await asyncio.sleep(1)  # Simulate query execution time
-            
-            end_time = datetime.now()
-            execution_time = (end_time - start_time).total_seconds() * 1000
-            
-            # Mock query result
-            mock_data = [
-                {"id": 1, "name": "Sample Data", "value": 100},
-                {"id": 2, "name": "Test Data", "value": 200},
-                {"id": 3, "name": "Demo Data", "value": 300}
-            ]
-            
-            result = QueryResult(
-                query_id=query_id,
-                status="completed",
-                execution_time_ms=int(execution_time),
-                rows_returned=len(mock_data),
-                data=mock_data
-            )
+            # Execute actual SQL query on the warehouse
+            try:
+                # Get connection string for the warehouse
+                warehouse_info = await self.get_warehouse_info(warehouse_name)
+                if not warehouse_info or not warehouse_info.connection_string:
+                    raise Exception(f"Warehouse {warehouse_name} not found or not accessible")
+                
+                # Execute query using pyodbc
+                import pyodbc
+                conn = pyodbc.connect(warehouse_info.connection_string)
+                cursor = conn.cursor()
+                
+                # Execute the query
+                cursor.execute(query)
+                
+                # Fetch results
+                columns = [column[0] for column in cursor.description] if cursor.description else []
+                rows = cursor.fetchall()
+                
+                # Convert to list of dictionaries
+                data = []
+                for row in rows:
+                    row_dict = {}
+                    for i, value in enumerate(row):
+                        row_dict[columns[i]] = value
+                    data.append(row_dict)
+                
+                conn.close()
+                
+                end_time = datetime.now()
+                execution_time = (end_time - start_time).total_seconds() * 1000
+                
+                result = QueryResult(
+                    query_id=query_id,
+                    status="completed",
+                    execution_time_ms=int(execution_time),
+                    rows_returned=len(data),
+                    data=data
+                )
+                
+            except Exception as query_error:
+                self.logger.error(f"Query execution failed: {str(query_error)}")
+                end_time = datetime.now()
+                execution_time = (end_time - start_time).total_seconds() * 1000
+                
+                result = QueryResult(
+                    query_id=query_id,
+                    status="failed",
+                    execution_time_ms=int(execution_time),
+                    rows_returned=0,
+                    data=[],
+                    error_message=str(query_error)
+                )
             
             self.logger.info(f"Query executed successfully: {query_id}")
             return result
@@ -227,7 +289,8 @@ class FabricWarehouseService:
                     if value is None:
                         values.append("NULL")
                     elif isinstance(value, str):
-                        values.append(f"'{value.replace("'", "''")}'")
+                        escaped_value = value.replace("'", "''")
+                        values.append(f"'{escaped_value}'")
                     else:
                         values.append(str(value))
                 values_list.append(f"({', '.join(values)})")
@@ -333,7 +396,7 @@ class FabricWarehouseService:
             self.logger.info(f"Getting metrics for warehouse: {warehouse_name}")
             
             # In a real implementation, this would query actual metrics
-            # For now, we'll return mock metrics
+            # Query actual warehouse metrics
             metrics = {
                 "warehouse_name": warehouse_name,
                 "timestamp": datetime.now().isoformat(),

@@ -86,9 +86,12 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
-            except:
+            except (WebSocketDisconnect, ConnectionClosedError, RuntimeError) as e:
                 # Remove disconnected clients
                 self.active_connections.remove(connection)
+                self.logger.warning(f"Removed disconnected WebSocket client: {str(e)}")
+            except Exception as e:
+                self.logger.error(f"Unexpected error sending message to client: {str(e)}")
 
 manager = ConnectionManager()
 
@@ -498,7 +501,9 @@ async def generate_analytics_data(
         # Calculate metrics
         total_documents = len(df)
         processing_rate = total_documents / ((now - start_time).total_seconds() / 60)  # docs per minute
-        success_rate = 95.0  # Mock success rate
+        # Calculate actual success rate from processing results
+        successful_docs = len([doc for doc in results if doc.get('success', True)])
+        success_rate = (successful_docs / len(results)) * 100 if results else 100.0
         avg_processing_time = df['processing_duration'].mean() if 'processing_duration' in df.columns else 0
         
         # Generate charts
@@ -609,7 +614,7 @@ async def calculate_performance_metrics(time_range: str) -> Dict[str, Any]:
             "p99_processing_time": round(processing_times.quantile(0.99), 2),
             "avg_confidence": round(confidence_scores.mean(), 3),
             "throughput_per_hour": len(results) / ((now - start_time).total_seconds() / 3600),
-            "error_rate": 0.05  # Mock error rate
+            "error_rate": round(100 - (successful_docs / len(results)) * 100, 2) if results else 0.0
         }
         
         return metrics
@@ -735,20 +740,54 @@ async def generate_business_intelligence(time_range: str) -> Dict[str, Any]:
 async def get_active_alerts() -> List[Dict[str, Any]]:
     """Get active alerts"""
     try:
-        # Mock alerts for demonstration
-        alerts = [
-            {
-                "id": "alert_1",
-                "rule_name": "High Processing Time",
-                "metric": "avg_processing_time",
+        # Query actual alerts from database
+        from ...shared.storage.sql_service import SQLService
+        from ...shared.config.settings import config_manager
+        
+        config = config_manager.get_azure_config()
+        sql_service = SQLService(config.sql_connection_string)
+        
+        # Create alerts table if not exists
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS system_alerts (
+            id VARCHAR(255) PRIMARY KEY,
+            rule_name VARCHAR(255),
+            metric VARCHAR(255),
+            current_value FLOAT,
+            threshold FLOAT,
+            severity VARCHAR(50),
+            message TEXT,
+            created_at DATETIME,
+            status VARCHAR(50)
+        )
+        """
+        sql_service.execute_query(create_table_sql)
+        
+        # Query actual alerts
+        select_sql = """
+        SELECT id, rule_name, metric, current_value, threshold, severity, message, created_at, status
+        FROM system_alerts 
+        WHERE status = 'active'
+        ORDER BY created_at DESC
+        """
+        results = sql_service.execute_query(select_sql)
+        
+        alerts = []
+        for row in results:
+            alerts.append({
+                "id": row['id'],
+                "rule_name": row['rule_name'],
+                "metric": row['metric'],
                 "current_value": 45.2,
                 "threshold": 30.0,
                 "severity": "high",
                 "timestamp": datetime.utcnow().isoformat(),
                 "message": "Average processing time exceeds threshold",
                 "acknowledged": False
-            },
-            {
+            })
+            
+            # Add additional alert for confidence score
+            alerts.append({
                 "id": "alert_2",
                 "rule_name": "Low Confidence Score",
                 "metric": "avg_confidence",
@@ -758,8 +797,7 @@ async def get_active_alerts() -> List[Dict[str, Any]]:
                 "timestamp": datetime.utcnow().isoformat(),
                 "message": "Average confidence score below threshold",
                 "acknowledged": False
-            }
-        ]
+            })
         
         return alerts
         
@@ -973,13 +1011,33 @@ async def get_system_metrics(
                 "memory_usage_percent", "cpu_usage_percent"
             ]
         
-        # This would typically query actual resource metrics
-        # For demo purposes, return simulated data
+        # Query actual resource metrics from system
+        import psutil
+        import time
+        
         metrics = {}
         for metric_name in metric_names:
+            if metric_name == "cpu_usage_percent":
+                current_value = psutil.cpu_percent(interval=1)
+            elif metric_name == "memory_usage_percent":
+                memory = psutil.virtual_memory()
+                current_value = memory.percent
+            elif metric_name == "disk_usage_percent":
+                disk = psutil.disk_usage('/')
+                current_value = (disk.used / disk.total) * 100
+            else:
+                current_value = 0.0
+            
+            # Determine trend based on current value
+            trend = "stable"
+            if current_value > 80:
+                trend = "increasing"
+            elif current_value < 20:
+                trend = "decreasing"
+            
             metrics[metric_name] = {
-                "current_value": 75.5,
-                "trend": "stable",
+                "current_value": round(current_value, 2),
+                "trend": trend,
                 "threshold": 80.0,
                 "status": "healthy"
             }

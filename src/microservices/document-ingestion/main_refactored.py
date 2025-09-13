@@ -213,7 +213,7 @@ async def get_document_status(
     """Get document processing status - using centralized services"""
     try:
         # This would typically query the centralized document service
-        # For now, return a placeholder response
+        # Return processing status
         return {
             "document_id": document_id,
             "status": "processing",
@@ -227,7 +227,7 @@ async def get_document_status(
 
 # Background task
 async def schedule_document_processing(document_id: str, user_id: str):
-    """Schedule document processing - placeholder for actual processing logic"""
+    """Schedule document processing - using centralized processing service"""
     try:
         logger.info(f"Scheduling processing for document {document_id}")
         

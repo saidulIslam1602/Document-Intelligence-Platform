@@ -243,37 +243,59 @@ class EventStore(ABC):
         """Get events by type"""
         pass
 
-class CosmosDBEventStore(EventStore):
-    """Cosmos DB implementation of event store"""
+class SQLEventStore(EventStore):
+    """Azure SQL Database implementation of event store"""
     
-    def __init__(self, cosmos_client, database_name: str, container_name: str):
-        self.cosmos_client = cosmos_client
-        self.database = cosmos_client.get_database_client(database_name)
-        self.container = self.database.get_container_client(container_name)
+    def __init__(self, sql_service):
+        self.sql_service = sql_service
         self.logger = logging.getLogger(__name__)
     
     async def append_events(self, events: List[DomainEvent]) -> None:
-        """Append events to Cosmos DB"""
+        """Append events to Azure SQL Database"""
         try:
             for event in events:
-                event_doc = event.to_dict()
-                event_doc["id"] = event.event_id
-                event_doc["partitionKey"] = event.aggregate_id
+                query = """
+                INSERT INTO domain_events 
+                (event_id, aggregate_id, event_type, event_data, timestamp, version)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """
                 
-                await self.container.create_item(event_doc)
+                params = (
+                    event.event_id,
+                    event.aggregate_id,
+                    event.event_type.value,
+                    json.dumps(event.event_data),
+                    event.timestamp,
+                    1  # Version will be calculated properly in production
+                )
+                
+                await self.sql_service.execute_non_query(query, params)
                 self.logger.info(f"Event {event.event_type.value} stored for aggregate {event.aggregate_id}")
         except Exception as e:
             self.logger.error(f"Failed to append events: {str(e)}")
             raise
     
     async def get_events(self, aggregate_id: str, from_version: int = 0) -> List[DomainEvent]:
-        """Get events for an aggregate from Cosmos DB"""
+        """Get events for an aggregate from Azure SQL Database"""
         try:
-            query = f"SELECT * FROM c WHERE c.aggregateId = '{aggregate_id}' AND c.version >= {from_version} ORDER BY c.version"
+            query = """
+            SELECT event_id, aggregate_id, event_type, event_data, timestamp, version
+            FROM domain_events 
+            WHERE aggregate_id = ? AND version >= ?
+            ORDER BY version
+            """
+            
+            result = await self.sql_service.execute_query(query, (aggregate_id, from_version))
             
             events = []
-            for item in self.container.query_items(query, enable_cross_partition_query=True):
-                event = DomainEvent.from_dict(item)
+            for row in result:
+                event = DomainEvent(
+                    event_type=EventType(row["event_type"]),
+                    aggregate_id=row["aggregate_id"],
+                    event_data=json.loads(row["event_data"]),
+                    event_id=row["event_id"],
+                    timestamp=row["timestamp"]
+                )
                 events.append(event)
             
             return events
@@ -283,16 +305,36 @@ class CosmosDBEventStore(EventStore):
     
     async def get_events_by_type(self, event_type: EventType, 
                                 from_timestamp: datetime = None) -> List[DomainEvent]:
-        """Get events by type from Cosmos DB"""
+        """Get events by type from Azure SQL Database"""
         try:
             if from_timestamp:
-                query = f"SELECT * FROM c WHERE c.eventType = '{event_type.value}' AND c.timestamp >= '{from_timestamp.isoformat()}' ORDER BY c.timestamp"
+                query = """
+                SELECT event_id, aggregate_id, event_type, event_data, timestamp, version
+                FROM domain_events 
+                WHERE event_type = ? AND timestamp >= ?
+                ORDER BY timestamp
+                """
+                params = (event_type.value, from_timestamp)
             else:
-                query = f"SELECT * FROM c WHERE c.eventType = '{event_type.value}' ORDER BY c.timestamp"
+                query = """
+                SELECT event_id, aggregate_id, event_type, event_data, timestamp, version
+                FROM domain_events 
+                WHERE event_type = ?
+                ORDER BY timestamp
+                """
+                params = (event_type.value,)
+            
+            result = await self.sql_service.execute_query(query, params)
             
             events = []
-            for item in self.container.query_items(query, enable_cross_partition_query=True):
-                event = DomainEvent.from_dict(item)
+            for row in result:
+                event = DomainEvent(
+                    event_type=EventType(row["event_type"]),
+                    aggregate_id=row["aggregate_id"],
+                    event_data=json.loads(row["event_data"]),
+                    event_id=row["event_id"],
+                    timestamp=row["timestamp"]
+                )
                 events.append(event)
             
             return events
