@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Microsoft-Grade Web Dashboard for Document Intelligence Platform
+Enterprise-Grade Web Dashboard for Document Intelligence Platform
 Production-ready web interface with advanced features
 """
 
@@ -101,7 +101,7 @@ print(f" OpenAI API key loaded: {api_key[:20]}...")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastAPI app with Microsoft-grade configuration
+# FastAPI app with enterprise-grade configuration
 app = FastAPI(
     title="Document Intelligence Platform",
     description="Enterprise Document Processing & Analytics Platform",
@@ -299,7 +299,7 @@ ai_service = DocumentAIService()
 # Routes
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    """Main dashboard with Microsoft Fluent UI design"""
+    """Main dashboard with modern UI design"""
     return HTMLResponse(content=get_dashboard_html())
 
 @app.post("/api/documents/upload", response_model=DocumentAnalysisResponse)
@@ -446,14 +446,14 @@ async def health_check():
     }
 
 def get_dashboard_html():
-    """Generate Microsoft Fluent UI dashboard HTML"""
+    """Generate modern enterprise dashboard HTML"""
     return """
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Document Intelligence Platform - Microsoft Fluent UI</title>
+        <title>Document Intelligence Platform - Enterprise Dashboard</title>
         <link href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/11.0.0/css/fabric.min.css" rel="stylesheet">
         <style>
             body { 
@@ -881,11 +881,11 @@ def get_dashboard_html():
     """
 
 if __name__ == "__main__":
-    print(" Starting Document Intelligence Platform - Microsoft Fluent UI")
+    print(" Starting Document Intelligence Platform - Enterprise Dashboard")
     print("=" * 70)
     print(" Web Dashboard: http://localhost:8000")
     print(" Using OpenAI API for AI analysis")
-    print(" Microsoft Fluent UI Design System")
+    print(" Modern UI Design System")
     print(" Real-time WebSocket updates")
     print("=" * 70)
     

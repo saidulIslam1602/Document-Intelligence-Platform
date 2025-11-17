@@ -1,5 +1,5 @@
 #!/bin/bash
-# Microsoft-Grade Web Dashboard Launcher
+# Enterprise-Grade Web Dashboard Launcher
 # Starts the Document Intelligence Platform with production-ready configuration
 
 echo "🚀 Document Intelligence Platform - Web Dashboard"
@@ -54,7 +54,7 @@ fi
 mkdir -p logs
 
 # Start the web dashboard
-echo "🌐 Starting Microsoft Fluent UI Web Dashboard..."
+echo "🌐 Starting Enterprise Web Dashboard..."
 echo "📱 Dashboard URL: http://localhost:8000"
 echo "📊 API Documentation: http://localhost:8000/api/docs"
 echo "🔌 WebSocket: ws://localhost:8000/ws"

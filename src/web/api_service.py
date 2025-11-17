@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Microsoft-Grade API Service for Document Intelligence Platform
+Enterprise-Grade API Service for Document Intelligence Platform
 Integrates with existing microservices and provides enterprise-grade APIs
 """
 
@@ -62,7 +62,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastAPI app with Microsoft-grade configuration
+# FastAPI app with enterprise-grade configuration
 app = FastAPI(
     title="Document Intelligence Platform API",
     description="Enterprise Document Processing & Analytics API",
@@ -142,8 +142,8 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     # In production, verify JWT token with Azure AD
     return {"user_id": "demo_user", "role": "admin"}
 
-# AI Service with Microsoft-grade features
-class DocumentAIService:
+# AI Service with enterprise-grade features
+class AIService:
     def __init__(self):
         self.openai_client = openai
         self.processing_stats = {
@@ -160,7 +160,7 @@ class DocumentAIService:
         self.processing_events = []
 
     async def analyze_document(self, content: bytes, filename: str, user_id: str) -> DocumentAnalysisResponse:
-        """Advanced document analysis with Microsoft-grade features"""
+        """Advanced document analysis with enterprise-grade features"""
         start_time = datetime.now()
         document_id = str(uuid.uuid4())
         

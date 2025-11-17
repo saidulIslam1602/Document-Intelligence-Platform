@@ -1,6 +1,7 @@
 """
 Advanced Prompt Engineering for Large Language Models
-Microsoft-level prompt optimization for M365 Copilot features
+"""
+Enterprise-level prompt optimization for M365 Copilot features
 """
 
 import asyncio

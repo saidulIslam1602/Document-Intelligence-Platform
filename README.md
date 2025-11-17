@@ -1222,7 +1222,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ##  Career Impact & Skills Demonstrated
 
-### For Microsoft Cloud & AI Solution Engineer Roles
+### For Cloud & AI Solution Engineer Roles
 
 **Cloud Architecture**
 - ✅ Azure multi-service integration (15+ Azure services)
@@ -1259,10 +1259,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - ✅ Technical documentation
 - ✅ Solution architecture design
 
-### Alignment with Microsoft Solution Assessments
+### Alignment with Solution Engineering Best Practices
 
 **Technical Depth** ⭐⭐⭐⭐⭐
-- Implements Microsoft Well-Architected Framework principles
+- Implements Well-Architected Framework principles
 - Uses Azure best practices for scalability and reliability
 - Demonstrates security-first design approach
 

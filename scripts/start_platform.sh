@@ -1,5 +1,5 @@
 #!/bin/bash
-# Microsoft-Grade Document Intelligence Platform Launcher
+# Enterprise-Grade Document Intelligence Platform Launcher
 # Starts all services with production-ready configuration
 
 echo "🚀 Document Intelligence Platform - Enterprise Launcher"
@@ -118,7 +118,7 @@ if [ "$all_healthy" = true ]; then
     echo "🎯 Features Available:"
     echo "   ✅ AI-Powered Document Processing"
     echo "   ✅ Real-time Analytics Dashboard"
-    echo "   ✅ Microsoft Fluent UI Design"
+    echo "   ✅ Modern UI Design"
     echo "   ✅ WebSocket Real-time Updates"
     echo "   ✅ A/B Testing Framework"
     echo "   ✅ Event Sourcing"

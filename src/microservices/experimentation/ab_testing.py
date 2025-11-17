@@ -1,6 +1,7 @@
 """
 Advanced A/B Testing Framework for Document Intelligence Platform
-Microsoft-level experimentation capabilities for M365 Copilot features
+"""
+Enterprise-level experimentation capabilities for M365 Copilot features
 """
 
 import asyncio
@@ -83,7 +84,7 @@ class ExperimentResult:
     timestamp: datetime
 
 class AdvancedABTestingFramework:
-    """Advanced A/B testing framework for Microsoft-level experimentation"""
+    """Advanced A/B testing framework for enterprise-level experimentation"""
     
     def __init__(self, event_bus: EventBus = None):
         self.config = config_manager.get_azure_config()
