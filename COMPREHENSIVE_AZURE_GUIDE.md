@@ -1,6 +1,6 @@
-# 🚀 **Comprehensive Azure Data Engineering Platform Guide**
+#  **Comprehensive Azure Data Engineering Platform Guide**
 
-## 📋 **Table of Contents**
+##  **Table of Contents**
 
 1. [Project Overview](#project-overview)
 2. [Architecture Deep Dive](#architecture-deep-dive)
@@ -16,7 +16,7 @@
 
 ---
 
-## 🎯 **Project Overview**
+##  **Project Overview**
 
 ### **What is this Platform?**
 
@@ -41,7 +41,7 @@ This is a **comprehensive Data Engineering Platform** built on Microsoft Azure t
 
 ---
 
-## 🏗️ **Architecture Deep Dive**
+##  **Architecture Deep Dive**
 
 ### **High-Level Architecture**
 
@@ -146,7 +146,7 @@ graph TB
   - Alert management
   - Resource utilization tracking
 
-#### **6. Data Quality Service** (Port 8006) ⭐ **NEW**
+#### **6. Data Quality Service** (Port 8006)  **NEW**
 - **Purpose**: Comprehensive data quality management
 - **Key Features**:
   - Data validation and profiling
@@ -154,7 +154,7 @@ graph TB
   - Real-time quality monitoring
   - Data quality reports
 
-#### **7. Batch Processor Service** (Port 8007) ⭐ **NEW**
+#### **7. Batch Processor Service** (Port 8007)  **NEW**
 - **Purpose**: ETL/ELT batch processing and data orchestration
 - **Key Features**:
   - Configurable ETL pipelines
@@ -162,7 +162,7 @@ graph TB
   - Batch processing scheduling
   - Pipeline monitoring
 
-#### **8. Data Catalog Service** (Port 8008) ⭐ **NEW**
+#### **8. Data Catalog Service** (Port 8008)  **NEW**
 - **Purpose**: Data governance and lineage tracking
 - **Key Features**:
   - Data asset catalog
@@ -172,7 +172,7 @@ graph TB
 
 ---
 
-## ☁️ **Azure Services Integration**
+##  **Azure Services Integration**
 
 ### **Core Azure Services**
 
@@ -293,7 +293,7 @@ graph TB
 
 ---
 
-## 🚀 **Deployment Guide**
+##  **Deployment Guide**
 
 ### **Prerequisites**
 
@@ -457,7 +457,7 @@ az monitor log-analytics workspace create \
 
 ---
 
-## 🔧 **Data Engineering Features**
+##  **Data Engineering Features**
 
 ### **1. Data Quality Framework**
 
@@ -581,7 +581,7 @@ results = await lineage_tracker.search_assets("documents", DataAssetType.TABLE)
 
 ---
 
-## 📚 **API Documentation**
+##  **API Documentation**
 
 ### **Data Quality Service API**
 
@@ -773,7 +773,7 @@ GET /lineage/table_documents?direction=both
 
 ---
 
-## 📊 **Monitoring & Operations**
+##  **Monitoring & Operations**
 
 ### **Azure Monitor Integration**
 
@@ -876,7 +876,7 @@ alert_rules:
 
 ---
 
-## 🔒 **Security & Compliance**
+##  **Security & Compliance**
 
 ### **Authentication & Authorization**
 
@@ -1018,7 +1018,7 @@ soc2_compliance:
 
 ---
 
-## 💰 **Cost Optimization**
+##  **Cost Optimization**
 
 ### **Azure Cost Management**
 
@@ -1109,7 +1109,7 @@ prod_environment:
 
 ---
 
-## 🔧 **Troubleshooting**
+##  **Troubleshooting**
 
 ### **Common Issues and Solutions**
 
@@ -1206,7 +1206,7 @@ alert_rule:
 
 ---
 
-## 📋 **Best Practices**
+##  **Best Practices**
 
 ### **Development Best Practices**
 
@@ -1214,18 +1214,18 @@ alert_rule:
 ```python
 # Use proper project structure
 src/
-├── microservices/
-│   ├── service-name/
-│   │   ├── main.py
-│   │   ├── models.py
-│   │   ├── services.py
-│   │   └── tests/
-├── shared/
-│   ├── config/
-│   ├── storage/
-│   ├── cache/
-│   └── monitoring/
-└── tests/
+ microservices/
+    service-name/
+       main.py
+       models.py
+       services.py
+       tests/
+ shared/
+    config/
+    storage/
+    cache/
+    monitoring/
+ tests/
 ```
 
 #### **2. Error Handling**
@@ -1356,7 +1356,7 @@ monitoring:
 
 ---
 
-## 🎯 **Conclusion**
+##  **Conclusion**
 
 This comprehensive Data Engineering Platform on Microsoft Azure provides:
 
@@ -1371,7 +1371,7 @@ The platform is ready for production deployment and can be used for various data
 
 ---
 
-## 📞 **Support**
+##  **Support**
 
 For questions, issues, or contributions:
 
@@ -1380,4 +1380,4 @@ For questions, issues, or contributions:
 3. **Discussions**: Use GitHub discussions for questions
 4. **Contributions**: Submit pull requests for improvements
 
-**Happy Data Engineering! 🚀**
+**Happy Data Engineering! **

@@ -114,13 +114,13 @@ async def get_dashboard():
     <body>
         <div class="container">
             <div class="header">
-                <h1>🚀 Performance Dashboard</h1>
+                <h1> Performance Dashboard</h1>
                 <p>Real-time system performance monitoring and optimization</p>
             </div>
             
             <div class="grid">
                 <div class="card">
-                    <h3>📊 System Metrics</h3>
+                    <h3> System Metrics</h3>
                     <div id="system-metrics">
                         <div class="metric">
                             <span>CPU Usage:</span>
@@ -142,7 +142,7 @@ async def get_dashboard():
                 </div>
                 
                 <div class="card">
-                    <h3>⚡ Performance Summary</h3>
+                    <h3> Performance Summary</h3>
                     <div id="performance-summary">
                         <div class="metric">
                             <span>Functions Called:</span>
@@ -160,14 +160,14 @@ async def get_dashboard():
                 </div>
                 
                 <div class="card">
-                    <h3>🚨 Active Alerts</h3>
+                    <h3> Active Alerts</h3>
                     <div id="alerts-container">
                         <div class="alert alert-info">No active alerts</div>
                     </div>
                 </div>
                 
                 <div class="card">
-                    <h3>💡 Optimization Recommendations</h3>
+                    <h3> Optimization Recommendations</h3>
                     <div id="optimizations-container">
                         <div class="optimization priority-high">
                             <h4>High Priority: Enable Connection Pooling</h4>

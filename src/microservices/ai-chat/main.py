@@ -23,11 +23,8 @@ from ...shared.auth.auth_service import get_current_user_id, User
 from ...shared.utils.error_handler import handle_validation_error, ErrorHandler
 from ...shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
 # Import AI processing services
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-from microservices.ai_processing.openai_service import OpenAIService
-from microservices.ai_processing.form_recognizer_service import FormRecognizerService
+from ..ai_processing.openai_service import OpenAIService
+from ..ai_processing.form_recognizer_service import FormRecognizerService
 
 # Initialize FastAPI app
 app = FastAPI(

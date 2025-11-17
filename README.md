@@ -1,4 +1,4 @@
-# 🚀 Enterprise Document Intelligence & Analytics Platform
+#  Enterprise Document Intelligence & Analytics Platform
 
 [![Azure](https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com/)
 [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
@@ -7,23 +7,23 @@
 
 A production-ready, enterprise-scale document processing platform built on Microsoft Azure that demonstrates advanced data engineering, AI/ML capabilities, real-time analytics, and **custom model fine-tuning** for industry-specific document intelligence.
 
-> **📋 Performance Disclaimer**: Performance metrics, cost savings, and scalability numbers in this README are based on Azure pricing, industry benchmarks, and theoretical calculations. Actual performance may vary based on document complexity, usage patterns, and system configuration. All claims are estimates unless otherwise specified as measured results.
+> ** Performance Disclaimer**: Performance metrics, cost savings, and scalability numbers in this README are based on Azure pricing, industry benchmarks, and theoretical calculations. Actual performance may vary based on document complexity, usage patterns, and system configuration. All claims are estimates unless otherwise specified as measured results.
 
-## ✨ Key Features
+##  Key Features
 
-- **🤖 AI-Powered Document Processing**: GPT-4, Form Recognizer, Custom ML Models
-- **🎯 Custom Model Fine-Tuning**: Azure OpenAI fine-tuning for industry-specific accuracy
-- **📊 Real-time Analytics**: Stream Analytics, Event Hubs, Power BI Integration
-- **🏗️ Microservices Architecture**: Azure Container Apps, Event-Driven Design
-- **🔗 M365 Integration**: Outlook, Teams, SharePoint, OneDrive
-- **🧪 A/B Testing Framework**: Microsoft-level experimentation capabilities
-- **⚡ Real-time Processing**: Expected sub-second response times with actual performance monitoring
-- **🔒 Enterprise Security**: Azure Key Vault, RBAC, Encryption
-- **🔄 Database Migration**: Teradata, Netezza, Oracle to Azure migration tools
-- **☁️ Microsoft Fabric**: OneLake, Data Warehouse, Real-time Intelligence
-- **🎯 Customer Engagement**: PoC framework, demo orchestration, workshop tools
+- ** AI-Powered Document Processing**: GPT-4, Form Recognizer, Custom ML Models
+- ** Custom Model Fine-Tuning**: Azure OpenAI fine-tuning for industry-specific accuracy
+- ** Real-time Analytics**: Stream Analytics, Event Hubs, Power BI Integration
+- ** Microservices Architecture**: Azure Container Apps, Event-Driven Design
+- ** M365 Integration**: Outlook, Teams, SharePoint, OneDrive
+- ** A/B Testing Framework**: Microsoft-level experimentation capabilities
+- ** Real-time Processing**: Expected sub-second response times with actual performance monitoring
+- ** Enterprise Security**: Azure Key Vault, RBAC, Encryption
+- ** Database Migration**: Teradata, Netezza, Oracle to Azure migration tools
+- ** Microsoft Fabric**: OneLake, Data Warehouse, Real-time Intelligence
+- ** Customer Engagement**: PoC framework, demo orchestration, workshop tools
 
-## 🎯 Fine-Tuning Capabilities
+##  Fine-Tuning Capabilities
 
 ### **Custom Model Training**
 - **Azure OpenAI Fine-Tuning**: GPT-4o, GPT-4o-mini, GPT-3.5-turbo support
@@ -39,7 +39,7 @@ A production-ready, enterprise-scale document processing platform built on Micro
 - **Continuous Learning**: Retrain with new data
 - **Production Deployment**: Seamless model deployment and monitoring
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -89,7 +89,7 @@ A production-ready, enterprise-scale document processing platform built on Micro
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Azure subscription with appropriate permissions
@@ -124,7 +124,7 @@ docker-compose up -d
 pytest tests/
 ```
 
-## 🎯 Fine-Tuning Usage
+##  Fine-Tuning Usage
 
 ### **1. Create Fine-Tuning Job**
 ```python
@@ -168,7 +168,7 @@ ws.onmessage = function(event) {
 };
 ```
 
-## 📊 Performance Metrics
+##  Performance Metrics
 
 ### **Expected Performance Comparison** *(Theoretical estimates based on Azure pricing and industry benchmarks)*
 | Metric | Generic Model | Fine-Tuned Model | Expected Improvement |
@@ -192,7 +192,7 @@ ws.onmessage = function(event) {
 - **Processing Volume**: Up to 1,000 documents/hour (measured)
 - **Document Complexity**: Simple text to complex multi-page forms
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 ### Backend Services
 - **Azure Container Apps**: Microservices orchestration
@@ -227,7 +227,7 @@ ws.onmessage = function(event) {
 - **PoC Framework**: Customer demonstration and proof-of-concept tools with database persistence
 - **Demo Orchestration**: Interactive demo and workshop capabilities
 
-## 🔄 Database Migration Capabilities
+##  Database Migration Capabilities
 
 This platform includes comprehensive migration tools for enterprise database modernization:
 
@@ -248,7 +248,7 @@ This platform includes comprehensive migration tools for enterprise database mod
 - **Data Validator**: Migration data integrity verification
 - **Performance Monitor**: Migration progress and performance tracking
 
-## ☁️ Microsoft Fabric Integration
+##  Microsoft Fabric Integration
 
 Seamless integration with Microsoft Fabric for modern data platform capabilities:
 
@@ -270,7 +270,7 @@ Seamless integration with Microsoft Fabric for modern data platform capabilities
 - **Real-time Dashboards**: Live monitoring and alerting
 - **Stream Analytics**: Complex event processing
 
-## 🎯 Customer Engagement Features
+##  Customer Engagement Features
 
 Built-in tools for customer demonstrations, PoCs, and technical workshops:
 
@@ -292,7 +292,7 @@ Built-in tools for customer demonstrations, PoCs, and technical workshops:
 - **Migration Planning**: Legacy system assessment and planning tools
 - **Best Practices**: Industry-specific implementation guides
 
-## 🔧 Real Performance Monitoring
+##  Real Performance Monitoring
 
 The platform includes comprehensive performance monitoring with actual metrics:
 
@@ -303,7 +303,7 @@ The platform includes comprehensive performance monitoring with actual metrics:
 - **Document Type Analytics**: Real metrics per document type
 - **Fine-Tuning Metrics**: Training progress, accuracy improvements, cost tracking
 
-## 💰 Cost Optimization with Fine-Tuning
+##  Cost Optimization with Fine-Tuning
 
 ### **Theoretical ROI Analysis** *(Based on Azure OpenAI pricing as of 2024)*
 ```
@@ -328,7 +328,7 @@ Fine-tuned Setup (GPT-4o-mini):
 - **Performance**: Expected 2-3x faster response times
 - **Scalability**: Maximum theoretical capacity for high-volume processing without rate limits
 
-## 📚 API Documentation
+##  API Documentation
 
 ### **Fine-Tuning Endpoints**
 - `POST /api/v1/fine-tuning/jobs` - Create fine-tuning job
@@ -343,7 +343,7 @@ Fine-tuned Setup (GPT-4o-mini):
 - `ws://localhost:8000/ws/fine-tuning-job/{job_id}` - Job monitoring
 - `ws://localhost:8000/ws/fine-tuning-workflow/{workflow_id}` - Workflow monitoring
 
-## 📚 Documentation
+##  Documentation
 
 - [Architecture Guide](docs/ARCHITECTURE.md)
 - [API Documentation](docs/API.md)
@@ -352,7 +352,7 @@ Fine-tuned Setup (GPT-4o-mini):
 - [Security Guide](docs/SECURITY.md)
 - [Fine-Tuning Guide](docs/FINE_TUNING.md)
 
-## 🤝 Contributing
+##  Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -360,11 +360,11 @@ Fine-tuned Setup (GPT-4o-mini):
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🎯 Career Impact
+##  Career Impact
 
 This project demonstrates:
 - **Enterprise Architecture**: Microservices, event-driven design
@@ -380,7 +380,7 @@ This project demonstrates:
 
 Perfect for showcasing skills relevant to **Microsoft Cloud & AI Solution Engineer** roles, particularly in Data Platform for commercial customers!
 
-## 📞 Contact
+##  Contact
 
 - **GitHub**: [@saidulIslam1602](https://github.com/saidulIslam1602)
 - **LinkedIn**: [https://www.linkedin.com/in/mdsaidulislam1602/]

@@ -10,7 +10,7 @@ from datetime import datetime
 
 def test_project_structure():
     """Test that all required files and directories exist"""
-    print("🔍 Testing Project Structure...")
+    print(" Testing Project Structure...")
     
     required_files = [
         "README.md",
@@ -33,15 +33,15 @@ def test_project_structure():
             missing_files.append(file_path)
     
     if missing_files:
-        print(f"❌ Missing files: {missing_files}")
+        print(f" Missing files: {missing_files}")
         return False
     else:
-        print("✅ All required files exist")
+        print(" All required files exist")
         return True
 
 def test_python_syntax():
     """Test that Python files have valid syntax"""
-    print("\n🐍 Testing Python Syntax...")
+    print("\n Testing Python Syntax...")
     
     python_files = [
         "src/shared/config/settings.py",
@@ -58,21 +58,21 @@ def test_python_syntax():
             try:
                 with open(file_path, 'r') as f:
                     compile(f.read(), file_path, 'exec')
-                print(f"✅ {file_path}")
+                print(f" {file_path}")
             except SyntaxError as e:
                 syntax_errors.append(f"{file_path}: {e}")
-                print(f"❌ {file_path}: {e}")
+                print(f" {file_path}: {e}")
     
     if syntax_errors:
-        print(f"❌ Syntax errors found: {syntax_errors}")
+        print(f" Syntax errors found: {syntax_errors}")
         return False
     else:
-        print("✅ All Python files have valid syntax")
+        print(" All Python files have valid syntax")
         return True
 
 def test_docker_compose():
     """Test that docker-compose.yml is valid"""
-    print("\n🐳 Testing Docker Compose...")
+    print("\n Testing Docker Compose...")
     
     try:
         with open("docker-compose.yml", 'r') as f:
@@ -87,26 +87,26 @@ def test_docker_compose():
                 missing_services.append(service)
         
         if missing_services:
-            print(f"❌ Missing services in docker-compose.yml: {missing_services}")
+            print(f" Missing services in docker-compose.yml: {missing_services}")
             return False
         else:
-            print("✅ Docker Compose configuration looks good")
+            print(" Docker Compose configuration looks good")
             return True
             
     except Exception as e:
-        print(f"❌ Docker Compose error: {e}")
+        print(f" Docker Compose error: {e}")
         return False
 
 def test_requirements():
     """Test that requirements.txt is valid"""
-    print("\n📦 Testing Requirements...")
+    print("\n Testing Requirements...")
     
     try:
         with open("requirements.txt", 'r') as f:
             lines = f.readlines()
         
         if len(lines) < 10:
-            print("❌ requirements.txt seems too short")
+            print(" requirements.txt seems too short")
             return False
         
         # Check for key dependencies
@@ -119,19 +119,19 @@ def test_requirements():
                 missing_deps.append(dep)
         
         if missing_deps:
-            print(f"❌ Missing key dependencies: {missing_deps}")
+            print(f" Missing key dependencies: {missing_deps}")
             return False
         else:
-            print("✅ Requirements.txt looks good")
+            print(" Requirements.txt looks good")
             return True
             
     except Exception as e:
-        print(f"❌ Requirements error: {e}")
+        print(f" Requirements error: {e}")
         return False
 
 def test_bicep_template():
     """Test that Bicep template is valid"""
-    print("\n🏗️ Testing Bicep Template...")
+    print("\n Testing Bicep Template...")
     
     try:
         with open("infrastructure/main.bicep", 'r') as f:
@@ -146,36 +146,36 @@ def test_bicep_template():
                 missing_resources.append(resource)
         
         if missing_resources:
-            print(f"❌ Missing Azure resources: {missing_resources}")
+            print(f" Missing Azure resources: {missing_resources}")
             return False
         else:
-            print("✅ Bicep template looks good")
+            print(" Bicep template looks good")
             return True
             
     except Exception as e:
-        print(f"❌ Bicep template error: {e}")
+        print(f" Bicep template error: {e}")
         return False
 
 def test_scripts():
     """Test that scripts are executable"""
-    print("\n🔧 Testing Scripts...")
+    print("\n Testing Scripts...")
     
     scripts = ["scripts/deploy.sh", "scripts/run_tests.sh"]
     
     for script in scripts:
         if os.path.exists(script):
             if os.access(script, os.X_OK):
-                print(f"✅ {script} is executable")
+                print(f" {script} is executable")
             else:
-                print(f"⚠️ {script} is not executable (run: chmod +x {script})")
+                print(f" {script} is not executable (run: chmod +x {script})")
         else:
-            print(f"❌ {script} not found")
+            print(f" {script} not found")
     
     return True
 
 def run_all_tests():
     """Run all basic tests"""
-    print("🚀 Document Intelligence Platform - Basic Tests")
+    print(" Document Intelligence Platform - Basic Tests")
     print("=" * 60)
     
     tests = [
@@ -195,13 +195,13 @@ def run_all_tests():
             passed += 1
     
     print("\n" + "=" * 60)
-    print(f"📊 Test Results: {passed}/{total} tests passed")
+    print(f" Test Results: {passed}/{total} tests passed")
     
     if passed == total:
-        print("🎉 Project structure is correct!")
-        print("✅ Ready to run with: docker-compose up -d")
+        print(" Project structure is correct!")
+        print(" Ready to run with: docker-compose up -d")
     else:
-        print("⚠️ Some issues need attention")
+        print(" Some issues need attention")
     
     return passed == total
 

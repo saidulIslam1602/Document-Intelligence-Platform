@@ -57,6 +57,20 @@ class AzureConfig:
     sql_server_name: str
     sql_database_name: str
     
+    # Migration Databases
+    teradata_host: str = ""
+    teradata_user: str = ""
+    teradata_password: str = ""
+    teradata_database: str = ""
+    netezza_host: str = ""
+    netezza_user: str = ""
+    netezza_password: str = ""
+    netezza_database: str = ""
+    oracle_host: str = ""
+    oracle_user: str = ""
+    oracle_password: str = ""
+    oracle_database: str = ""
+    
     # Event Services
     event_hub_connection_string: str
     service_bus_connection_string: str
@@ -235,6 +249,20 @@ class ConfigManager:
             sql_connection_string=os.getenv("SQL_CONNECTION_STRING", ""),
             sql_server_name=os.getenv("SQL_SERVER_NAME", ""),
             sql_database_name=os.getenv("SQL_DATABASE_NAME", "documentintelligence"),
+            
+            # Migration Databases
+            teradata_host=os.getenv("TERADATA_HOST", ""),
+            teradata_user=os.getenv("TERADATA_USER", ""),
+            teradata_password=os.getenv("TERADATA_PASSWORD", ""),
+            teradata_database=os.getenv("TERADATA_DATABASE", ""),
+            netezza_host=os.getenv("NETEZZA_HOST", ""),
+            netezza_user=os.getenv("NETEZZA_USER", ""),
+            netezza_password=os.getenv("NETEZZA_PASSWORD", ""),
+            netezza_database=os.getenv("NETEZZA_DATABASE", ""),
+            oracle_host=os.getenv("ORACLE_HOST", ""),
+            oracle_user=os.getenv("ORACLE_USER", ""),
+            oracle_password=os.getenv("ORACLE_PASSWORD", ""),
+            oracle_database=os.getenv("ORACLE_DATABASE", ""),
             
             # Event Services
             event_hub_connection_string=os.getenv("EVENT_HUB_CONNECTION_STRING", ""),

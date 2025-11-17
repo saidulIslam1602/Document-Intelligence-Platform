@@ -90,12 +90,12 @@ settings = AppSettings()
 # Initialize OpenAI
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
-    print("❌ Error: OPENAI_API_KEY not found in environment")
-    print("💡 Make sure local.env exists with your OpenAI API key")
+    print(" Error: OPENAI_API_KEY not found in environment")
+    print(" Make sure local.env exists with your OpenAI API key")
     sys.exit(1)
 
 openai.api_key = api_key
-print(f"✅ OpenAI API key loaded: {api_key[:20]}...")
+print(f" OpenAI API key loaded: {api_key[:20]}...")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -571,21 +571,21 @@ def get_dashboard_html():
     <body>
         <div class="ms-Nav" style="height: 60px; display: flex; align-items: center; padding: 0 20px;">
             <div style="color: white; font-size: 20px; font-weight: 600;">
-                🚀 Document Intelligence Platform
+                 Document Intelligence Platform
             </div>
         </div>
 
         <div class="ms-CommandBar" style="padding: 8px 20px;">
             <button class="ms-Button ms-Button--primary" onclick="refreshAnalytics()">
-                <span class="ms-Button-icon">🔄</span>
+                <span class="ms-Button-icon"></span>
                 <span class="ms-Button-label">Refresh</span>
             </button>
             <button class="ms-Button" onclick="exportData()">
-                <span class="ms-Button-icon">📊</span>
+                <span class="ms-Button-icon"></span>
                 <span class="ms-Button-label">Export Data</span>
             </button>
             <button class="ms-Button" onclick="createABTest()">
-                <span class="ms-Button-icon">🧪</span>
+                <span class="ms-Button-icon"></span>
                 <span class="ms-Button-label">A/B Test</span>
             </button>
         </div>
@@ -595,10 +595,10 @@ def get_dashboard_html():
                 <div>
                     <div class="ms-Card" style="padding: 20px;">
                         <h2 class="ms-fontSize-xl ms-fontWeight-semibold" style="margin-bottom: 16px;">
-                            📤 Document Upload
+                             Document Upload
                         </h2>
                         <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                            <div style="font-size: 48px; margin-bottom: 16px;">📄</div>
+                            <div style="font-size: 48px; margin-bottom: 16px;"></div>
                             <p class="ms-fontSize-l">Drag & drop documents here</p>
                             <p class="ms-fontSize-s" style="color: #605e5c;">or click to browse files</p>
                             <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.png,.jpg" style="display: none;" multiple>
@@ -611,7 +611,7 @@ def get_dashboard_html():
 
                     <div class="ms-Card" style="padding: 20px; margin-top: 20px;">
                         <h3 class="ms-fontSize-l ms-fontWeight-semibold" style="margin-bottom: 16px;">
-                            🤖 AI Analysis Results
+                             AI Analysis Results
                         </h3>
                         <div id="aiAnalysis">
                             <p class="ms-fontSize-m" style="color: #605e5c;">Upload a document to see AI analysis</p>
@@ -641,7 +641,7 @@ def get_dashboard_html():
 
                     <div class="ms-Card" style="padding: 20px;">
                         <h3 class="ms-fontSize-l ms-fontWeight-semibold" style="margin-bottom: 16px;">
-                            📋 Recent Documents
+                             Recent Documents
                         </h3>
                         <div class="document-list" id="documentList">
                             <p class="ms-fontSize-m" style="color: #605e5c;">No documents processed yet</p>
@@ -652,11 +652,11 @@ def get_dashboard_html():
 
             <div class="ms-Card" style="padding: 20px; margin-top: 20px;">
                 <h3 class="ms-fontSize-l ms-fontWeight-semibold" style="margin-bottom: 16px;">
-                    🎯 Platform Capabilities
+                     Platform Capabilities
                 </h3>
                 <div class="ms-Grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
                     <div>
-                        <h4 class="ms-fontSize-m ms-fontWeight-semibold">🤖 AI Processing</h4>
+                        <h4 class="ms-fontSize-m ms-fontWeight-semibold"> AI Processing</h4>
                         <ul class="ms-List" style="margin: 8px 0;">
                             <li>GPT-4 Text Analysis</li>
                             <li>Entity Extraction</li>
@@ -666,7 +666,7 @@ def get_dashboard_html():
                         </ul>
                     </div>
                     <div>
-                        <h4 class="ms-fontSize-m ms-fontWeight-semibold">📊 Real-time Analytics</h4>
+                        <h4 class="ms-fontSize-m ms-fontWeight-semibold"> Real-time Analytics</h4>
                         <ul class="ms-List" style="margin: 8px 0;">
                             <li>Live Metrics Dashboard</li>
                             <li>Performance Tracking</li>
@@ -676,7 +676,7 @@ def get_dashboard_html():
                         </ul>
                     </div>
                     <div>
-                        <h4 class="ms-fontSize-m ms-fontWeight-semibold">🔗 M365 Integration</h4>
+                        <h4 class="ms-fontSize-m ms-fontWeight-semibold"> M365 Integration</h4>
                         <ul class="ms-List" style="margin: 8px 0;">
                             <li>Outlook Email Processing</li>
                             <li>Teams Collaboration</li>
@@ -686,7 +686,7 @@ def get_dashboard_html():
                         </ul>
                     </div>
                     <div>
-                        <h4 class="ms-fontSize-m ms-fontWeight-semibold">⚡ Enterprise Features</h4>
+                        <h4 class="ms-fontSize-m ms-fontWeight-semibold"> Enterprise Features</h4>
                         <ul class="ms-List" style="margin: 8px 0;">
                             <li>Event-driven Architecture</li>
                             <li>Auto-scaling</li>
@@ -881,12 +881,12 @@ def get_dashboard_html():
     """
 
 if __name__ == "__main__":
-    print("🚀 Starting Document Intelligence Platform - Microsoft Fluent UI")
+    print(" Starting Document Intelligence Platform - Microsoft Fluent UI")
     print("=" * 70)
-    print("📱 Web Dashboard: http://localhost:8000")
-    print("🔑 Using OpenAI API for AI analysis")
-    print("🎨 Microsoft Fluent UI Design System")
-    print("⚡ Real-time WebSocket updates")
+    print(" Web Dashboard: http://localhost:8000")
+    print(" Using OpenAI API for AI analysis")
+    print(" Microsoft Fluent UI Design System")
+    print(" Real-time WebSocket updates")
     print("=" * 70)
     
     uvicorn.run(

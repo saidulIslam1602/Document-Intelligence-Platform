@@ -513,11 +513,11 @@ async def health_check():
     }
 
 if __name__ == "__main__":
-    print("🚀 Document Intelligence Platform API Service")
+    print(" Document Intelligence Platform API Service")
     print("=" * 50)
-    print("📡 API Server: http://localhost:8001")
-    print("📚 API Docs: http://localhost:8001/docs")
-    print("🔑 Using OpenAI API for AI analysis")
+    print(" API Server: http://localhost:8001")
+    print(" API Docs: http://localhost:8001/docs")
+    print(" Using OpenAI API for AI analysis")
     print("=" * 50)
     
     uvicorn.run(
