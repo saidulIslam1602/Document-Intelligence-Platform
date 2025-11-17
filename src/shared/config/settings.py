@@ -280,9 +280,93 @@ class ConfigManager:
     
     def _load_from_key_vault(self) -> AzureConfig:
         """Load configuration from Azure Key Vault"""
-        # Implementation for production Key Vault access
-        # This would retrieve secrets from Key Vault
-        pass
+        try:
+            # Get Key Vault URL from environment
+            key_vault_url = os.getenv("KEY_VAULT_URL", "")
+            if not key_vault_url:
+                raise ValueError("KEY_VAULT_URL not configured for production environment")
+            
+            # Initialize Key Vault client with DefaultAzureCredential
+            credential = DefaultAzureCredential()
+            client = SecretClient(vault_url=key_vault_url, credential=credential)
+            self._key_vault_client = client
+            
+            # Helper function to safely retrieve secrets
+            def get_kv_secret(secret_name: str, default: str = "") -> str:
+                try:
+                    secret = client.get_secret(secret_name)
+                    return secret.value
+                except Exception as e:
+                    print(f"Warning: Could not retrieve secret '{secret_name}' from Key Vault: {e}")
+                    return os.getenv(secret_name.upper().replace("-", "_"), default)
+            
+            # Load all Azure configuration from Key Vault
+            return AzureConfig(
+                # Storage
+                storage_account_name=get_kv_secret("storage-account-name"),
+                storage_account_key=get_kv_secret("storage-account-key"),
+                storage_container_name=get_kv_secret("storage-container-name", "documents"),
+                data_lake_account_name=get_kv_secret("data-lake-account-name"),
+                data_lake_container_name=get_kv_secret("data-lake-container-name", "data"),
+                
+                # SQL Database
+                sql_server=get_kv_secret("sql-server"),
+                sql_database=get_kv_secret("sql-database"),
+                sql_username=get_kv_secret("sql-username"),
+                sql_password=get_kv_secret("sql-password"),
+                sql_driver=get_kv_secret("sql-driver", "ODBC Driver 18 for SQL Server"),
+                
+                # Cosmos DB
+                cosmos_endpoint=get_kv_secret("cosmos-endpoint"),
+                cosmos_key=get_kv_secret("cosmos-key"),
+                cosmos_database_name=get_kv_secret("cosmos-database-name", "document-intelligence"),
+                cosmos_container_name=get_kv_secret("cosmos-container-name", "documents"),
+                
+                # AI Services
+                openai_api_key=get_kv_secret("openai-api-key"),
+                openai_endpoint=get_kv_secret("openai-endpoint"),
+                openai_deployment=get_kv_secret("openai-deployment", "gpt-4o"),
+                openai_api_version=get_kv_secret("openai-api-version", "2024-02-15-preview"),
+                
+                # Form Recognizer
+                form_recognizer_endpoint=get_kv_secret("form-recognizer-endpoint"),
+                form_recognizer_key=get_kv_secret("form-recognizer-key"),
+                
+                # Event Hub
+                event_hub_connection_string=get_kv_secret("event-hub-connection-string"),
+                event_hub_name=get_kv_secret("event-hub-name", "document-events"),
+                
+                # Service Bus
+                service_bus_connection_string=get_kv_secret("service-bus-connection-string"),
+                service_bus_queue_name=get_kv_secret("service-bus-queue-name", "document-processing"),
+                
+                # Search Service
+                search_service_endpoint=get_kv_secret("search-service-endpoint"),
+                search_service_key=get_kv_secret("search-service-key"),
+                search_index_name=get_kv_secret("search-index-name", "documents"),
+                
+                # Migration Database Hosts
+                teradata_host=get_kv_secret("teradata-host"),
+                teradata_user=get_kv_secret("teradata-user"),
+                teradata_password=get_kv_secret("teradata-password"),
+                teradata_database=get_kv_secret("teradata-database"),
+                netezza_host=get_kv_secret("netezza-host"),
+                netezza_user=get_kv_secret("netezza-user"),
+                netezza_password=get_kv_secret("netezza-password"),
+                netezza_database=get_kv_secret("netezza-database"),
+                oracle_host=get_kv_secret("oracle-host"),
+                oracle_user=get_kv_secret("oracle-user"),
+                oracle_password=get_kv_secret("oracle-password"),
+                oracle_database=get_kv_secret("oracle-database"),
+                
+                # Monitoring
+                application_insights_connection_string=get_kv_secret("application-insights-connection-string"),
+                log_analytics_workspace_id=get_kv_secret("log-analytics-workspace-id")
+            )
+        except Exception as e:
+            print(f"Error loading configuration from Key Vault: {e}")
+            print("Falling back to environment variables...")
+            return self._load_from_environment()
     
     def _load_security_config(self) -> SecurityConfig:
         """Load security configuration"""

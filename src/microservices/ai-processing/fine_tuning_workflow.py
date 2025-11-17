@@ -746,25 +746,166 @@ class DocumentFineTuningWorkflow:
     # Additional helper methods would be implemented here
     async def _get_workflow_documents(self, workflow: FineTuningWorkflow) -> List[Dict[str, Any]]:
         """Get documents for workflow"""
-        # Implementation would query database for workflow documents
-        return []
+        try:
+            # Query database for documents matching workflow criteria
+            query = """
+            SELECT document_id, file_name, file_type, extracted_text, 
+                   metadata, processing_status, created_at
+            FROM documents
+            WHERE document_type = ? AND processing_status = 'completed'
+            ORDER BY created_at DESC
+            LIMIT 1000
+            """
+            
+            params = (workflow.document_type,)
+            results = await self.sql_service.execute_query(query, params)
+            
+            documents = []
+            for row in results:
+                doc = {
+                    "document_id": row[0],
+                    "file_name": row[1],
+                    "file_type": row[2],
+                    "extracted_text": row[3],
+                    "metadata": json.loads(row[4]) if row[4] else {},
+                    "processing_status": row[5],
+                    "created_at": row[6].isoformat() if row[6] else None
+                }
+                documents.append(doc)
+            
+            self.logger.info(f"Retrieved {len(documents)} documents for workflow {workflow.workflow_id}")
+            return documents
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving workflow documents: {str(e)}")
+            return []
     
     async def _store_preprocessed_data(self, workflow_id: str, documents: List[Dict[str, Any]]):
         """Store preprocessed data"""
-        # Implementation would store preprocessed documents
-        pass
+        try:
+            # Store preprocessed documents in a dedicated table
+            for doc in documents:
+                query = """
+                INSERT INTO fine_tuning_preprocessed_data
+                (workflow_id, document_id, preprocessed_text, features, metadata, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (workflow_id, document_id) DO UPDATE SET
+                    preprocessed_text = EXCLUDED.preprocessed_text,
+                    features = EXCLUDED.features,
+                    metadata = EXCLUDED.metadata,
+                    created_at = EXCLUDED.created_at
+                """
+                
+                params = (
+                    workflow_id,
+                    doc.get("document_id"),
+                    doc.get("preprocessed_text", ""),
+                    json.dumps(doc.get("features", {})),
+                    json.dumps(doc.get("metadata", {})),
+                    datetime.now()
+                )
+                
+                await self.sql_service.execute_non_query(query, params)
+            
+            self.logger.info(f"Stored {len(documents)} preprocessed documents for workflow {workflow_id}")
+            
+        except Exception as e:
+            self.logger.error(f"Error storing preprocessed data: {str(e)}")
+            raise
     
     async def _get_preprocessed_data(self, workflow_id: str) -> List[Dict[str, Any]]:
         """Get preprocessed data"""
-        # Implementation would retrieve preprocessed documents
-        return []
+        try:
+            query = """
+            SELECT document_id, preprocessed_text, features, metadata, created_at
+            FROM fine_tuning_preprocessed_data
+            WHERE workflow_id = ?
+            ORDER BY created_at ASC
+            """
+            
+            params = (workflow_id,)
+            results = await self.sql_service.execute_query(query, params)
+            
+            documents = []
+            for row in results:
+                doc = {
+                    "document_id": row[0],
+                    "preprocessed_text": row[1],
+                    "features": json.loads(row[2]) if row[2] else {},
+                    "metadata": json.loads(row[3]) if row[3] else {},
+                    "created_at": row[4].isoformat() if row[4] else None
+                }
+                documents.append(doc)
+            
+            self.logger.info(f"Retrieved {len(documents)} preprocessed documents for workflow {workflow_id}")
+            return documents
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving preprocessed data: {str(e)}")
+            return []
     
     async def _get_test_documents(self, workflow: FineTuningWorkflow) -> List[Dict[str, Any]]:
         """Get test documents for evaluation"""
-        # Implementation would get test documents
-        return []
+        try:
+            # Get a separate set of documents for testing (20% split)
+            query = """
+            SELECT document_id, file_name, extracted_text, metadata
+            FROM documents
+            WHERE document_type = ? 
+                AND processing_status = 'completed'
+                AND document_id NOT IN (
+                    SELECT document_id FROM fine_tuning_preprocessed_data 
+                    WHERE workflow_id = ?
+                )
+            ORDER BY created_at DESC
+            LIMIT 200
+            """
+            
+            params = (workflow.document_type, workflow.workflow_id)
+            results = await self.sql_service.execute_query(query, params)
+            
+            test_docs = []
+            for row in results:
+                doc = {
+                    "document_id": row[0],
+                    "file_name": row[1],
+                    "extracted_text": row[2],
+                    "metadata": json.loads(row[3]) if row[3] else {}
+                }
+                test_docs.append(doc)
+            
+            self.logger.info(f"Retrieved {len(test_docs)} test documents for workflow {workflow.workflow_id}")
+            return test_docs
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving test documents: {str(e)}")
+            return []
     
     async def _store_monitoring_config(self, workflow_id: str, config: Dict[str, Any]):
         """Store monitoring configuration"""
-        # Implementation would store monitoring config
-        pass
+        try:
+            query = """
+            INSERT INTO fine_tuning_monitoring_config
+            (workflow_id, config_data, alert_thresholds, notification_settings, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (workflow_id) DO UPDATE SET
+                config_data = EXCLUDED.config_data,
+                alert_thresholds = EXCLUDED.alert_thresholds,
+                notification_settings = EXCLUDED.notification_settings,
+                created_at = EXCLUDED.created_at
+            """
+            
+            params = (
+                workflow_id,
+                json.dumps(config.get("config_data", {})),
+                json.dumps(config.get("alert_thresholds", {})),
+                json.dumps(config.get("notification_settings", {})),
+                datetime.now()
+            )
+            
+            await self.sql_service.execute_non_query(query, params)
+            self.logger.info(f"Stored monitoring configuration for workflow {workflow_id}")
+            
+        except Exception as e:
+            self.logger.error(f"Error storing monitoring config: {str(e)}")
+            raise
