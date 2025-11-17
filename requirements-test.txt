@@ -17,7 +17,7 @@ aiofiles==23.2.1
 PyJWT==2.8.0
 
 # Basic Azure packages for testing
-azure-storage-blob==12.19.0
+azure-storage-blob==12.20.0
 azure-identity==1.15.0
 
 # Data processing (lightweight)
