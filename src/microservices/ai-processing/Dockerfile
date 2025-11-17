@@ -8,14 +8,13 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy requirements and install dependencies
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
-COPY src/ ./src/
+# Copy shared modules and microservice code
+COPY src/shared ./src/shared/
+COPY src/microservices/ai-processing ./src/microservices/ai-processing/
 
 # Set Python path
 ENV PYTHONPATH=/app

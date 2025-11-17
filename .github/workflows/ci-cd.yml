@@ -41,7 +41,7 @@ jobs:
     
     - name: Build Docker images
       run: |
-        docker build -t document-ingestion:latest src/microservices/document-ingestion/
-        docker build -t ai-processing:latest src/microservices/ai-processing/
-        docker build -t analytics:latest src/microservices/analytics/
-        docker build -t api-gateway:latest src/microservices/api-gateway/
+        docker build -t document-ingestion:latest -f src/microservices/document-ingestion/Dockerfile .
+        docker build -t ai-processing:latest -f src/microservices/ai-processing/Dockerfile .
+        docker build -t analytics:latest -f src/microservices/analytics/Dockerfile .
+        docker build -t api-gateway:latest -f src/microservices/api-gateway/Dockerfile .
