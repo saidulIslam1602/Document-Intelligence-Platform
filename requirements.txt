@@ -12,17 +12,14 @@ azure-keyvault-secrets==4.7.0
 azure-eventhub==5.11.1
 azure-eventhub-checkpointstoreblob==1.1.4
 azure-ai-formrecognizer==3.3.2
-azure-ai-translator==1.0.0b1
-azure-ai-contentmoderator==1.0.0
+azure-ai-translation-text==1.0.0
 azure-search-documents==11.4.0
 azure-mgmt-resource==23.0.1
 azure-mgmt-storage==21.0.0
 azure-mgmt-cosmosdb==9.3.0
 azure-mgmt-eventhub==10.1.0
-azure-mgmt-machinelearning==1.0.0
 azure-mgmt-cognitiveservices==7.0.0
 azure-mgmt-sql==3.0.1
-azure-mgmt-powerbi==1.0.0
 azure-monitor-query==1.2.0
 azure-mgmt-monitor==6.0.1
 
