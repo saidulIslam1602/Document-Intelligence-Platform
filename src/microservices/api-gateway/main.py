@@ -26,6 +26,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from ...shared.config.settings import config_manager
 from ...shared.health import get_health_service
 from ...shared.resilience.circuit_breaker import CircuitBreakerRegistry
+from ...shared.rate_limiting import RateLimiterRegistry
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -398,6 +399,65 @@ async def reset_all_circuit_breakers():
     
     return {
         "message": "All circuit breakers reset to CLOSED",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@app.get("/rate-limiters")
+async def get_rate_limiters():
+    """
+    Get status of all rate limiters
+    Shows current token count, request stats, and wait times
+    """
+    stats = RateLimiterRegistry.get_all_stats()
+    
+    # Calculate overall statistics
+    total_requests = sum(s["total_requests"] for s in stats.values())
+    total_waited = sum(s["total_waited"] for s in stats.values())
+    
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "summary": {
+            "total_limiters": len(stats),
+            "total_requests": total_requests,
+            "total_waited": total_waited,
+            "overall_wait_rate": (total_waited / total_requests * 100) 
+                if total_requests > 0 else 0.0
+        },
+        "limiters": stats
+    }
+
+
+@app.post("/rate-limiters/{limiter_name}/reset")
+async def reset_rate_limiter(limiter_name: str):
+    """
+    Manually reset a rate limiter to initial state
+    Useful for clearing statistics or resetting after configuration changes
+    """
+    limiters = RateLimiterRegistry.get_all()
+    
+    if limiter_name not in limiters:
+        raise HTTPException(status_code=404, detail=f"Rate limiter '{limiter_name}' not found")
+    
+    limiter = limiters[limiter_name]
+    limiter.reset()
+    
+    return {
+        "message": f"Rate limiter '{limiter_name}' reset to initial state",
+        "stats": limiter.get_stats()
+    }
+
+
+@app.post("/rate-limiters/reset-all")
+async def reset_all_rate_limiters():
+    """
+    Reset all rate limiters to initial state
+    Use to clear all statistics or after configuration changes
+    """
+    RateLimiterRegistry.reset_all()
+    
+    return {
+        "message": "All rate limiters reset to initial state",
         "timestamp": datetime.utcnow().isoformat()
     }
 

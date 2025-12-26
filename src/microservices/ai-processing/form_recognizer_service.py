@@ -14,6 +14,7 @@ from azure.core.exceptions import ResourceNotFoundError, ServiceRequestError
 
 from ...shared.config.settings import config_manager
 from ...shared.events.event_sourcing import DomainEvent, EventType, EventBus
+from ...shared.rate_limiting import form_recognizer_rate_limit
 
 class FormRecognizerService:
     """Azure Form Recognizer service for document analysis"""
@@ -40,9 +41,13 @@ class FormRecognizerService:
             "layout": "prebuilt-layout"
         }
     
+    @form_recognizer_rate_limit
     async def analyze_document(self, document_content: bytes, 
                              model_type: str = "general") -> Dict[str, Any]:
-        """Analyze document using specified model"""
+        """
+        Analyze document using specified model
+        Rate limited to prevent quota exhaustion
+        """
         try:
             model = self.document_models.get(model_type, "prebuilt-document")
             
