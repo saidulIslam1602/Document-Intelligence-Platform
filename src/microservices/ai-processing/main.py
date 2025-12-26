@@ -30,6 +30,8 @@ from .fine_tuning_workflow import DocumentFineTuningWorkflow
 from .fine_tuning_dashboard import FineTuningDashboard
 from .fine_tuning_websocket import router as fine_tuning_ws_router
 from .fine_tuning_database import initialize_fine_tuning_database
+from .langchain_orchestration import LangChainOrchestrator, DocumentProcessingAgent
+from .llmops_automation import LLMOpsAutomationTracker
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -71,6 +73,9 @@ ml_model_manager = MLModelManager(event_bus)
 fine_tuning_service = DocumentFineTuningService(event_bus)
 fine_tuning_workflow = DocumentFineTuningWorkflow(event_bus)
 fine_tuning_dashboard = FineTuningDashboard(event_bus)
+langchain_orchestrator = LangChainOrchestrator(event_bus)
+document_agent = DocumentProcessingAgent(event_bus)
+llmops_tracker = LLMOpsAutomationTracker(event_bus)
 
 # Pydantic models
 class ProcessingRequest(BaseModel):
@@ -390,6 +395,216 @@ async def train_model(
         
     except Exception as e:
         logger.error(f"Error training model: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# LangChain orchestration endpoints
+@app.post("/process-invoice-langchain")
+async def process_invoice_with_langchain(
+    document_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """Process invoice using LangChain orchestration"""
+    try:
+        # Get document
+        document = await get_document(document_id, user_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Download document content
+        document_content = await download_document_content(document["blob_path"])
+        
+        # Process with LangChain
+        result = await langchain_orchestrator.process_invoice_with_langchain(
+            document_content,
+            document_id
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing invoice with LangChain: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/analyze-document-langchain")
+async def analyze_document_with_langchain(
+    document_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """Analyze document using LangChain orchestration"""
+    try:
+        # Get document
+        document = await get_document(document_id, user_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Get document text
+        document_text = document.get("extracted_text", "")
+        if not document_text:
+            # Extract text if not already done
+            document_content = await download_document_content(document["blob_path"])
+            text_extraction = await form_recognizer_service.extract_text(document_content)
+            document_text = text_extraction["text"]
+        
+        # Analyze with LangChain
+        result = await langchain_orchestrator.analyze_document_with_langchain(
+            document_text,
+            document_id
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing document with LangChain: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/fine-tuning-workflow-langchain")
+async def orchestrate_fine_tuning_with_langchain(
+    training_data_sample: str,
+    model_type: str = "gpt-3.5-turbo",
+    user_id: str = Depends(get_current_user)
+):
+    """Orchestrate fine-tuning workflow using LangChain"""
+    try:
+        result = await langchain_orchestrator.orchestrate_fine_tuning_workflow(
+            training_data_sample,
+            model_type
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error orchestrating fine-tuning workflow: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/process-document-agent")
+async def process_document_with_agent(
+    document_id: str,
+    task_description: str,
+    user_id: str = Depends(get_current_user)
+):
+    """Process document using multi-agent workflow"""
+    try:
+        result = await document_agent.process_document_with_agent(
+            document_id,
+            task_description
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error processing document with agent: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# Enhanced LLMOps with automation tracking endpoints
+@app.post("/llmops/track-model-metrics")
+async def track_model_automation_metrics(
+    model_id: str,
+    model_name: str,
+    test_documents: List[str],
+    user_id: str = Depends(get_current_user)
+):
+    """Track automation metrics for a fine-tuned model"""
+    try:
+        metrics = await llmops_tracker.track_model_automation_metrics(
+            model_id,
+            model_name,
+            test_documents
+        )
+        
+        return {
+            "model_id": metrics.model_id,
+            "model_name": metrics.model_name,
+            "automation_rate": round(metrics.automation_rate, 2),
+            "accuracy": round(metrics.accuracy, 3),
+            "confidence": round(metrics.confidence, 3),
+            "completeness": round(metrics.completeness, 3),
+            "validation_pass_rate": round(metrics.validation_pass_rate, 2),
+            "processing_speed": round(metrics.processing_speed, 2),
+            "cost_per_document": round(metrics.cost_per_document, 4),
+            "documents_processed": metrics.documents_processed,
+            "timestamp": metrics.timestamp.isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error tracking model metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/llmops/compare-models")
+async def compare_baseline_and_finetuned_models(
+    baseline_model_id: str,
+    fine_tuned_model_id: str,
+    test_documents: List[str],
+    user_id: str = Depends(get_current_user)
+):
+    """Compare baseline and fine-tuned model performance"""
+    try:
+        comparison = await llmops_tracker.compare_models(
+            baseline_model_id,
+            fine_tuned_model_id,
+            test_documents
+        )
+        
+        return {
+            "baseline_metrics": {
+                "automation_rate": round(comparison.baseline_metrics.automation_rate, 2),
+                "accuracy": round(comparison.baseline_metrics.accuracy, 3),
+                "confidence": round(comparison.baseline_metrics.confidence, 3),
+                "completeness": round(comparison.baseline_metrics.completeness, 3),
+                "processing_speed": round(comparison.baseline_metrics.processing_speed, 2),
+                "cost_per_document": round(comparison.baseline_metrics.cost_per_document, 4)
+            },
+            "fine_tuned_metrics": {
+                "automation_rate": round(comparison.fine_tuned_metrics.automation_rate, 2),
+                "accuracy": round(comparison.fine_tuned_metrics.accuracy, 3),
+                "confidence": round(comparison.fine_tuned_metrics.confidence, 3),
+                "completeness": round(comparison.fine_tuned_metrics.completeness, 3),
+                "processing_speed": round(comparison.fine_tuned_metrics.processing_speed, 2),
+                "cost_per_document": round(comparison.fine_tuned_metrics.cost_per_document, 4)
+            },
+            "improvement": comparison.improvement,
+            "recommendation": comparison.recommendation,
+            "confidence_level": comparison.confidence_level
+        }
+        
+    except Exception as e:
+        logger.error(f"Error comparing models: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/llmops/optimize-for-goal")
+async def optimize_model_for_automation_goal(
+    current_model_id: str,
+    target_automation_rate: float = 90.0,
+    user_id: str = Depends(get_current_user)
+):
+    """Get optimization recommendations to achieve automation goal"""
+    try:
+        optimization = await llmops_tracker.optimize_for_automation_goal(
+            current_model_id,
+            target_automation_rate
+        )
+        
+        return optimization
+        
+    except Exception as e:
+        logger.error(f"Error optimizing for automation goal: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/llmops/automation-dashboard")
+async def get_llmops_automation_dashboard(
+    time_range: str = "7d",
+    user_id: str = Depends(get_current_user)
+):
+    """Get automation dashboard data for LLMOps"""
+    try:
+        dashboard_data = await llmops_tracker.generate_automation_dashboard_data(time_range)
+        return dashboard_data
+        
+    except Exception as e:
+        logger.error(f"Error getting automation dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 # Get model status endpoint

@@ -328,6 +328,33 @@ services:
       - docintel-network
     restart: unless-stopped
 
+  # MCP Server (Port 8012 - Model Context Protocol)
+  mcp-server:
+    build:
+      context: .
+      dockerfile: src/microservices/mcp-server/Dockerfile
+    container_name: docintel-mcp-server
+    ports:
+      - "8012:8012"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379
+      - AI_PROCESSING_URL=http://ai-processing:8001
+      - DATA_QUALITY_URL=http://data-quality:8006
+      - ANALYTICS_URL=http://analytics:8002
+      - DOCUMENT_INGESTION_URL=http://document-ingestion:8000
+      - AI_CHAT_URL=http://ai-chat:8004
+    depends_on:
+      - redis
+      - ai-processing
+      - analytics
+      - data-quality
+    networks:
+      - docintel-network
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
   # Migration Service
   migration-service:
     build:

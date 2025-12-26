@@ -67,7 +67,16 @@ SERVICE_ENDPOINTS = {
     "document-ingestion": "http://document-ingestion:8000",
     "ai-processing": "http://ai-processing:8001",
     "analytics": "http://analytics:8002",
-    "user-management": "http://user-management:8003"
+    "user-management": "http://user-management:8003",
+    "ai-chat": "http://ai-chat:8004",
+    "performance-dashboard": "http://performance-dashboard:8005",
+    "data-quality": "http://data-quality:8006",
+    "batch-processor": "http://batch-processor:8007",
+    "data-catalog": "http://data-catalog:8008",
+    "migration-service": "http://migration-service:8009",
+    "fabric-integration": "http://fabric-integration:8010",
+    "demo-service": "http://demo-service:8011",
+    "mcp-server": "http://mcp-server:8012"
 }
 
 # Rate limiting configuration
@@ -282,7 +291,10 @@ async def health_check():
         "services": {
             "document-ingestion": await check_service_health("document-ingestion"),
             "ai-processing": await check_service_health("ai-processing"),
-            "analytics": await check_service_health("analytics")
+            "analytics": await check_service_health("analytics"),
+            "mcp-server": await check_service_health("mcp-server"),
+            "ai-chat": await check_service_health("ai-chat"),
+            "data-quality": await check_service_health("data-quality")
         }
     }
 
@@ -306,6 +318,26 @@ async def route_analytics_requests(request: Request, path: str):
 async def route_user_requests(request: Request, path: str):
     """Route requests to user management service"""
     return await route_request(request, "user-management", f"/users/{path}")
+
+@app.api_route("/mcp/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def route_mcp_requests(request: Request, path: str):
+    """Route requests to MCP server"""
+    return await route_request(request, "mcp-server", f"/mcp/{path}")
+
+@app.api_route("/chat/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def route_chat_requests(request: Request, path: str):
+    """Route requests to AI chat service"""
+    return await route_request(request, "ai-chat", f"/chat/{path}")
+
+@app.api_route("/quality/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def route_quality_requests(request: Request, path: str):
+    """Route requests to data quality service"""
+    return await route_request(request, "data-quality", f"/quality/{path}")
+
+@app.api_route("/llmops/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def route_llmops_requests(request: Request, path: str):
+    """Route requests to AI processing service for LLMOps"""
+    return await route_request(request, "ai-processing", f"/llmops/{path}")
 
 # Authentication endpoints
 @app.post("/auth/login")

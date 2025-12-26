@@ -30,6 +30,7 @@ from ...shared.storage.sql_service import SQLService
 from ...shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
 from ...shared.services.powerbi_service import powerbi_service
 from ...shared.monitoring.advanced_monitoring import monitoring_service
+from .automation_scoring import AutomationScoringEngine
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -66,6 +67,9 @@ service_bus_client = ServiceBusClient.from_connection_string(
 
 # Metrics client for Azure Monitor
 metrics_client = MetricsQueryClient(DefaultAzureCredential())
+
+# Initialize automation scoring engine
+automation_engine = AutomationScoringEngine(sql_service)
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -991,6 +995,159 @@ async def create_alert_rule(rule: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Failed to create alert rule: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create alert rule")
+
+# Automation metrics endpoints
+@app.get("/analytics/automation-metrics")
+async def get_automation_metrics(
+    time_range: str = "24h",
+    user_id: str = Depends(get_current_user)
+):
+    """Get invoice automation metrics to track progress toward 90%+ goal"""
+    try:
+        metrics = automation_engine.calculate_automation_metrics(time_range)
+        goal_check = automation_engine.check_automation_goal(metrics.automation_rate)
+        
+        return {
+            "automation_rate": round(metrics.automation_rate, 2),
+            "total_processed": metrics.total_processed,
+            "fully_automated": metrics.fully_automated,
+            "requires_review": metrics.requires_review,
+            "manual_intervention": metrics.manual_intervention,
+            "average_confidence": round(metrics.average_confidence, 3),
+            "average_completeness": round(metrics.average_completeness, 3),
+            "validation_pass_rate": round(metrics.validation_pass_rate, 2),
+            "time_range": time_range,
+            "goal_status": goal_check,
+            "timestamp": metrics.timestamp.isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting automation metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get automation metrics")
+
+@app.post("/analytics/automation-score")
+async def calculate_automation_score(
+    invoice_data: Dict[str, Any],
+    validation_result: Dict[str, Any],
+    user_id: str = Depends(get_current_user)
+):
+    """Calculate and store automation score for an invoice"""
+    try:
+        score = automation_engine.calculate_invoice_score(invoice_data, validation_result)
+        automation_engine.store_automation_score(score)
+        
+        return {
+            "document_id": score.document_id,
+            "confidence_score": round(score.confidence_score, 3),
+            "completeness_score": round(score.completeness_score, 3),
+            "validation_pass": score.validation_pass,
+            "automation_score": round(score.automation_score, 3),
+            "requires_review": score.requires_review,
+            "timestamp": score.timestamp.isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculating automation score: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to calculate automation score")
+
+@app.get("/analytics/automation-insights")
+async def get_automation_insights(
+    time_range: str = "7d",
+    user_id: str = Depends(get_current_user)
+):
+    """Get insights and recommendations for improving automation"""
+    try:
+        insights = automation_engine.get_automation_insights(time_range)
+        metrics = automation_engine.calculate_automation_metrics(time_range)
+        goal_check = automation_engine.check_automation_goal(metrics.automation_rate)
+        
+        return {
+            "insights": insights,
+            "current_metrics": {
+                "automation_rate": round(metrics.automation_rate, 2),
+                "average_confidence": round(metrics.average_confidence, 3),
+                "average_completeness": round(metrics.average_completeness, 3),
+                "validation_pass_rate": round(metrics.validation_pass_rate, 2)
+            },
+            "goal_status": goal_check,
+            "time_range": time_range,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting automation insights: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get automation insights")
+
+@app.get("/analytics/automation-trend")
+async def get_automation_trend(
+    days: int = 30,
+    user_id: str = Depends(get_current_user)
+):
+    """Get automation rate trend over time"""
+    try:
+        # Query daily automation metrics
+        query = """
+            SELECT 
+                DATE(created_at) as date,
+                COUNT(*) as total,
+                SUM(CASE WHEN requires_review = 0 THEN 1 ELSE 0 END) as automated,
+                AVG(automation_score) as avg_score,
+                AVG(confidence_score) as avg_confidence,
+                AVG(completeness_score) as avg_completeness
+            FROM automation_scores
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+            GROUP BY DATE(created_at)
+            ORDER BY date ASC
+        """
+        
+        results = sql_service.execute_query(query, (days,))
+        
+        if not results:
+            return {
+                "trend": [],
+                "summary": {
+                    "improvement": 0.0,
+                    "direction": "stable"
+                }
+            }
+        
+        # Convert to trend data
+        trend = []
+        for row in results:
+            automation_rate = (row['automated'] / row['total']) * 100 if row['total'] > 0 else 0
+            trend.append({
+                "date": row['date'].isoformat() if hasattr(row['date'], 'isoformat') else str(row['date']),
+                "automation_rate": round(automation_rate, 2),
+                "total_processed": row['total'],
+                "automated_count": row['automated'],
+                "average_score": round(row['avg_score'], 3),
+                "average_confidence": round(row['avg_confidence'], 3),
+                "average_completeness": round(row['avg_completeness'], 3)
+            })
+        
+        # Calculate improvement
+        if len(trend) >= 2:
+            first_rate = trend[0]['automation_rate']
+            last_rate = trend[-1]['automation_rate']
+            improvement = last_rate - first_rate
+            direction = "improving" if improvement > 1 else ("declining" if improvement < -1 else "stable")
+        else:
+            improvement = 0.0
+            direction = "stable"
+        
+        return {
+            "trend": trend,
+            "summary": {
+                "improvement": round(improvement, 2),
+                "direction": direction,
+                "days": days
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting automation trend: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get automation trend")
 
 @app.get("/monitoring/metrics")
 async def get_system_metrics(

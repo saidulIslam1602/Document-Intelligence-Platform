@@ -1,64 +1,80 @@
-# Core Dependencies
 fastapi==0.104.1
-uvicorn==0.24.0
+uvicorn[standard]==0.24.0
 pydantic==2.5.0
 python-multipart==0.0.6
+httpx==0.25.1
+aiofiles==23.2.1
 
-# Azure Dependencies
-azure-storage-blob==12.20.0
-azure-storage-file-datalake==12.15.0
-azure-identity==1.15.0
+# Azure SDK
+azure-storage-blob==12.19.0
+azure-storage-file-datalake==12.13.1
+azure-ai-formrecognizer==3.3.1
+azure-ai-textanalytics==5.3.0
+azure-cosmos==4.5.1
+azure-servicebus==7.11.4
+azure-eventhub==5.11.5
 azure-keyvault-secrets==4.7.0
-azure-eventhub==5.11.1
-azure-eventhub-checkpointstoreblob==1.1.4
-azure-ai-formrecognizer==3.3.2
-azure-ai-translation-text==1.0.0
-azure-search-documents==11.4.0
-azure-mgmt-resource==23.0.1
-azure-mgmt-storage==21.0.0
-azure-mgmt-cosmosdb==9.3.0
-azure-mgmt-eventhub==10.1.0
-azure-mgmt-cognitiveservices==7.0.0
-azure-mgmt-sql==3.0.1
+azure-identity==1.15.0
 azure-monitor-query==1.2.0
-azure-mgmt-monitor==6.0.1
+azure-search-documents==11.4.0
 
-# Migration Dependencies
+# OpenAI
+openai==1.3.5
+
+# LangChain for orchestration
+langchain==0.1.0
+langchain-openai==0.0.2
+langchain-community==0.0.10
+
+# MCP (Model Context Protocol)
+mcp==0.9.0
+
+# Database
 pyodbc==5.0.1
-teradatasql==20.0.0.36
-cx-Oracle==8.3.0
-psycopg2-binary==2.9.9
-PyMySQL==1.1.0
-
-# Performance Dependencies
+sqlalchemy==2.0.23
 redis==5.0.1
-aioredis==2.0.1
 
-# Data Engineering Dependencies
-pandas==2.1.4
-numpy==1.24.4
-networkx==3.2.1
-psutil==5.9.6
+# Data Processing
+pandas==2.1.3
+numpy==1.26.2
 scikit-learn==1.3.2
-polars==0.20.0
-pyarrow==14.0.1
 
-# AI/ML Dependencies
-openai==1.3.0
-scipy==1.11.4
-transformers==4.36.0
-torch==2.1.2
-tensorflow==2.15.0.post1
-tiktoken>=0.5.0
+# ML & NLP
+transformers==4.35.2
+torch==2.1.1
+spacy==3.7.2
+
+# Visualization
+plotly==5.18.0
+matplotlib==3.8.2
+
+# Monitoring & Logging
+prometheus-client==0.19.0
+opencensus-ext-azure==1.1.11
+python-json-logger==2.0.7
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+PyJWT==2.8.0
+
+# Utilities
+python-dotenv==1.0.0
+requests==2.31.0
+pyyaml==6.0.1
 
 # Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
-httpx==0.25.2
+faker==20.1.0
 
-# Utilities
-python-dotenv==1.0.0
-requests==2.31.0
-aiofiles==23.2.1
-PyJWT==2.8.0
+# Documentation
+python-markdown==3.5.1
+
+# Power BI
+powerbiclient==3.1.1
+
+# Performance
+psutil==5.9.6
