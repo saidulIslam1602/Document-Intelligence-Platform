@@ -14,13 +14,13 @@ import httpx
 from azure.monitor.query import MetricsQueryClient, LogsQueryClient
 from azure.identity import DefaultAzureCredential
 from azure.monitor.query import MetricsQueryClient, LogsQueryClient
-from azure.mgmt.monitor import MonitorManagementClient
-from azure.mgmt.monitor.models import (
-    MetricAlertResource, MetricAlertSingleResourceMultipleMetricCriteria,
-    MetricCriteria, MetricAlertAction, ActionGroupResource, EmailReceiver,
-    WebhookReceiver, SmsReceiver, VoiceReceiver, LogicAppReceiver,
-    AzureFunctionReceiver, ArmRoleReceiver, AutomationRunbookReceiver
-)
+# from azure.mgmt.monitor import MonitorManagementClient
+# from azure.mgmt.monitor.models import (
+#     MetricAlertResource, MetricAlertSingleResourceMultipleMetricCriteria,
+#     MetricCriteria, MetricAlertAction, ActionGroupResource, EmailReceiver,
+#     WebhookReceiver, SmsReceiver, VoiceReceiver, LogicAppReceiver,
+#     AzureFunctionReceiver, ArmRoleReceiver, AutomationRunbookReceiver
+# )
 
 from ..config.settings import config_manager
 
@@ -79,7 +79,7 @@ class AdvancedMonitoringService:
         # Monitoring clients
         self.metrics_client = MetricsQueryClient(self.credential)
         self.logs_client = LogsQueryClient(self.credential)
-        self.monitor_client = MonitorManagementClient(
+        self.monitor_client = # MonitorManagementClient(
             self.credential,
             self.config.subscription_id
         )

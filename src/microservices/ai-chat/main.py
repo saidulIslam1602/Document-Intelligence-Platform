@@ -502,9 +502,20 @@ logger = logging.getLogger(__name__)
 
 # Azure clients
 sql_service = SQLService(config.sql_connection_string)
-blob_service_client = BlobServiceClient.from_connection_string(
-    config.storage_connection_string
-)
+
+# Blob service client (optional for dev)
+if config.storage_connection_string:
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(
+            config.storage_connection_string
+        )
+        logger.info("Blob service client initialized")
+    except Exception as e:
+        logger.warning(f"Failed to initialize blob service: {str(e)}")
+        blob_service_client = None
+else:
+    logger.info("Blob storage not configured - running in development mode")
+    blob_service_client = None
 
 # AI Services
 openai_service = OpenAIService()

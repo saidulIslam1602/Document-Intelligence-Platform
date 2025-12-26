@@ -844,8 +844,8 @@ def get_form_recognizer_limiter() -> RateLimiter:
     
     return RateLimiterRegistry.get(
         "form_recognizer",
-        rate_per_second=settings.form_recognizer.rate_limit_per_second,
-        burst_capacity=settings.form_recognizer.burst_capacity
+        rate_per_second=5,
+        burst_capacity=10
     )
 
 
@@ -863,8 +863,8 @@ def form_recognizer_rate_limit(func: Callable) -> Callable:
     
     return rate_limit(
         "form_recognizer",
-        rate_per_second=settings.form_recognizer.rate_limit_per_second,
-        burst_capacity=settings.form_recognizer.burst_capacity
+        rate_per_second=5,
+        burst_capacity=10
     )(func)
 
 

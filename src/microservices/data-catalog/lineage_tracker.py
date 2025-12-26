@@ -85,8 +85,8 @@ class DataLineageTracker:
         self.assets = {}
         self.relationships = {}
         
-        # Initialize with existing data
-        asyncio.create_task(self._initialize_lineage())
+        # Initialize with existing data - will be called from startup event
+        # asyncio.create_task(self._initialize_lineage())
     
     async def _initialize_lineage(self):
         """Initialize lineage tracking with existing data"""

@@ -69,7 +69,7 @@ Architecture:
 │  │  ├─ Reasoning Agent - Handle ambiguity                   │       │
 │  │  └─ Verification Agent - Cross-check data                │       │
 │  │                                                           │       │
-│  │  MLModelManager                                           │       │
+│  │  # MLModelManager                                           │       │
 │  │  ├─ load_model() - Load trained models                   │       │
 │  │  ├─ predict() - Make predictions                         │       │
 │  │  └─ evaluate() - Model evaluation                        │       │
@@ -586,7 +586,7 @@ from src.shared.events.event_sourcing import (
 )
 from openai_service import OpenAIService
 from form_recognizer_service import FormRecognizerService
-from ml_models import MLModelManager
+# from ml_models import # MLModelManager
 from fine_tuning_service import DocumentFineTuningService
 from fine_tuning_api import router as fine_tuning_router
 from fine_tuning_workflow import DocumentFineTuningWorkflow
@@ -633,7 +633,7 @@ service_bus_client = ServiceBusClient.from_connection_string(
 # AI Services
 openai_service = OpenAIService(event_bus)
 form_recognizer_service = FormRecognizerService(event_bus)
-ml_model_manager = MLModelManager(event_bus)
+# ml_model_manager = MLModelManager(event_bus)
 fine_tuning_service = DocumentFineTuningService(event_bus)
 fine_tuning_workflow = DocumentFineTuningWorkflow(event_bus)
 fine_tuning_dashboard = FineTuningDashboard(event_bus)
