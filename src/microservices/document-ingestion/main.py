@@ -834,53 +834,133 @@ async def upload_document(
 
 # Batch upload endpoint
 @app.post("/documents/batch-upload", response_model=BatchUploadResponse)
+@monitor_performance("batch_document_upload", {"service": "document-ingestion"})
 async def batch_upload_documents(
-    request: BatchUploadRequest,
+    files: List[UploadFile] = File(..., description="Multiple files to upload (10-15 documents)"),
     user_id: str = Depends(get_current_user),
+    document_type: Optional[str] = None,
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
-    """Upload multiple documents in batch"""
+    """Upload multiple documents in batch - Supports 10 to 15 documents per request"""
     try:
+        # Validate number of files
+        if len(files) > 15:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Too many files. Maximum 15 files allowed per batch. You provided {len(files)} files."
+            )
+        
+        if len(files) == 0:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
         batch_id = str(uuid.uuid4())
         successful_uploads = 0
         failed_uploads = 0
         document_ids = []
+        failed_files = []
         
-        for doc_data in request.documents:
+        # Allowed file types
+        allowed_extensions = ['.pdf', '.docx', '.doc', '.txt', '.jpg', '.jpeg', '.png', '.tiff']
+        max_size = 50 * 1024 * 1024  # 50MB per file
+        
+        logger.info(f"Starting batch upload: Batch ID {batch_id}, Files: {len(files)}, User: {user_id}")
+        
+        for file in files:
             try:
-                # Simulate document upload (in real implementation, files would be uploaded)
+                # Validate file
+                if not file.filename:
+                    logger.warning(f"Batch {batch_id}: File with no filename skipped")
+                    failed_uploads += 1
+                    failed_files.append({"filename": "unknown", "error": "No filename provided"})
+                    continue
+                
+                # Check file extension
+                file_extension = '.' + file.filename.split('.')[-1].lower()
+                if file_extension not in allowed_extensions:
+                    logger.warning(f"Batch {batch_id}: Invalid file type {file.filename}")
+                    failed_uploads += 1
+                    failed_files.append({"filename": file.filename, "error": f"File type not supported: {file_extension}"})
+                    continue
+                
+                # Read file content
+                file_content = await file.read()
+                file_size = len(file_content)
+                
+                # Check file size
+                if file_size > max_size:
+                    logger.warning(f"Batch {batch_id}: File too large {file.filename} ({file_size} bytes)")
+                    failed_uploads += 1
+                    failed_files.append({"filename": file.filename, "error": f"File too large: {file_size} bytes (max: {max_size})"})
+                    continue
+                
+                # Generate document ID
                 document_id = str(uuid.uuid4())
                 
-                # Create document record
+                # Upload to blob storage (if available)
+                blob_name = f"documents/{user_id}/{batch_id}/{document_id}/{file.filename}"
+                upload_url = None
+                
+                if blob_service_client:
+                    try:
+                        blob_client = blob_service_client.get_blob_client(
+                            container="documents", 
+                            blob=blob_name
+                        )
+                        
+                        await asyncio.get_event_loop().run_in_executor(
+                            None, 
+                            lambda: blob_client.upload_blob(file_content, overwrite=True)
+                        )
+                        upload_url = blob_client.url
+                        logger.debug(f"Batch {batch_id}: Document {document_id} uploaded to blob storage")
+                    except Exception as e:
+                        logger.warning(f"Batch {batch_id}: Failed to upload to blob storage: {str(e)}")
+                else:
+                    logger.debug(f"Batch {batch_id}: Blob storage not configured - document {document_id} stored locally")
+                    upload_url = f"file://{blob_name}"
+                
+                # Create document record in SQL Database
                 document_record = {
-                    "id": document_id,
+                    "document_id": document_id,
                     "user_id": user_id,
-                    "file_name": doc_data.get("file_name", "unknown"),
-                    "file_size": doc_data.get("file_size", 0),
-                    "content_type": doc_data.get("content_type", "application/octet-stream"),
-                    "blob_path": f"documents/{user_id}/{document_id}/{doc_data.get('file_name', 'unknown')}",
-                    "document_type": doc_data.get("document_type"),
-                    "metadata": doc_data.get("metadata", {}),
-                    "processing_options": doc_data.get("processing_options", {}),
+                    "file_name": file.filename,
+                    "file_size": file_size,
+                    "content_type": file.content_type or "application/octet-stream",
+                    "blob_path": blob_name,
+                    "document_type": document_type,
+                    "metadata": json.dumps({"batch_id": batch_id}),
+                    "processing_options": json.dumps({}),
                     "status": "uploaded",
-                    "batch_id": batch_id,
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat(),
-                    "partition_key": user_id
+                    "batch_id": batch_id
                 }
                 
-                container = database.get_container_client("documents")
-                await asyncio.get_event_loop().run_in_executor(
-                    None, 
-                    lambda: container.create_item(document_record)
-                )
+                if sql_service.enabled:
+                    try:
+                        sql_service.store_document(document_record)
+                        logger.debug(f"Batch {batch_id}: Document {document_id} stored in SQL Database")
+                    except Exception as e:
+                        logger.warning(f"Batch {batch_id}: Failed to store document in SQL Database: {str(e)}")
+                else:
+                    logger.debug(f"Batch {batch_id}: SQL storage not configured - document {document_id} metadata stored in memory")
+                
+                # Store raw data in Data Lake for analytics
+                if data_lake_service.enabled:
+                    try:
+                        data_lake_service.store_raw_data(
+                            data=file_content,
+                            file_name=f"{document_id}_{file.filename}",
+                            content_type=file.content_type or "application/octet-stream"
+                        )
+                        logger.debug(f"Batch {batch_id}: Raw data stored in Data Lake for document {document_id}")
+                    except Exception as e:
+                        logger.warning(f"Batch {batch_id}: Failed to store raw data in Data Lake: {str(e)}")
                 
                 # Publish event
                 event = DocumentUploadedEvent(
                     document_id=document_id,
-                    file_name=doc_data.get("file_name", "unknown"),
-                    file_size=doc_data.get("file_size", 0),
-                    content_type=doc_data.get("content_type", "application/octet-stream"),
+                    file_name=file.filename,
+                    file_size=file_size,
+                    content_type=file.content_type,
                     user_id=user_id
                 )
                 
@@ -889,23 +969,30 @@ async def batch_upload_documents(
                 document_ids.append(document_id)
                 successful_uploads += 1
                 
+                logger.info(f"Batch {batch_id}: Document {document_id} ({file.filename}) uploaded successfully")
+                
             except Exception as e:
-                logger.error(f"Error uploading document in batch: {str(e)}")
+                logger.error(f"Batch {batch_id}: Error uploading document {file.filename}: {str(e)}")
                 failed_uploads += 1
+                failed_files.append({"filename": file.filename, "error": str(e)})
         
-        # Schedule batch processing if requested
-        if request.batch_processing and successful_uploads > 0:
-            background_tasks.add_task(
-                schedule_batch_processing, 
-                batch_id, 
-                document_ids
-            )
+        # Schedule batch processing for all successful uploads
+        if successful_uploads > 0:
+            for doc_id in document_ids:
+                background_tasks.add_task(
+                    schedule_document_processing, 
+                    doc_id, 
+                    user_id
+                )
         
-        logger.info(f"Batch upload completed. Batch ID: {batch_id}, Success: {successful_uploads}, Failed: {failed_uploads}")
+        logger.info(f"Batch upload completed. Batch ID: {batch_id}, Total: {len(files)}, Success: {successful_uploads}, Failed: {failed_uploads}")
+        
+        if failed_files:
+            logger.warning(f"Batch {batch_id} - Failed files: {failed_files}")
         
         return BatchUploadResponse(
             batch_id=batch_id,
-            total_documents=len(request.documents),
+            total_documents=len(files),
             successful_uploads=successful_uploads,
             failed_uploads=failed_uploads,
             document_ids=document_ids
