@@ -367,18 +367,253 @@ class LLMOpsAutomationTracker:
         model_id: str,
         document_id: str
     ) -> Dict[str, Any]:
-        """Process document with specific model (simplified simulation)"""
-        # This would call the actual model inference API
-        # For now, return simulated results
+        """
+        Process document with specific model
+        Real implementation that evaluates fine-tuned models
+        """
+        try:
+            start_time = datetime.utcnow()
+            
+            # 1. Retrieve document from database
+            document = await self._get_test_document(document_id)
+            if not document:
+                raise ValueError(f"Test document {document_id} not found")
+            
+            # 2. Process with fine-tuned model
+            result = await self._invoke_fine_tuned_model(
+                model_id,
+                document["content"],
+                document.get("document_type", "invoice")
+            )
+            
+            # 3. Calculate metrics by comparing with ground truth
+            ground_truth = document.get("ground_truth", {})
+            metrics = self._calculate_accuracy_metrics(result, ground_truth)
+            
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+            
+            return {
+                "document_id": document_id,
+                "model_id": model_id,
+                "confidence": metrics["confidence"],
+                "completeness": metrics["completeness"],
+                "validation_passed": metrics["validation_passed"],
+                "fully_automated": metrics["fully_automated"],
+                "processing_time": processing_time,
+                "accuracy": metrics["accuracy"]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing document {document_id} with model {model_id}: {e}")
+            # Return conservative metrics for failed processing
+            return {
+                "document_id": document_id,
+                "model_id": model_id,
+                "confidence": 0.0,
+                "completeness": 0.0,
+                "validation_passed": False,
+                "fully_automated": False,
+                "processing_time": 0.0,
+                "accuracy": 0.0,
+                "error": str(e)
+            }
+    
+    async def _get_test_document(self, document_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve test document from database"""
+        try:
+            # Query test documents table
+            query = """
+                SELECT 
+                    id,
+                    content,
+                    document_type,
+                    ground_truth,
+                    created_at
+                FROM fine_tuning_test_documents
+                WHERE id = ?
+            """
+            results = self.sql_service.execute_query(query, (document_id,))
+            
+            if results:
+                doc = results[0]
+                # Parse ground_truth JSON if it's stored as string
+                if isinstance(doc.get("ground_truth"), str):
+                    import json
+                    doc["ground_truth"] = json.loads(doc["ground_truth"])
+                return doc
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error retrieving test document {document_id}: {e}")
+            return None
+    
+    async def _invoke_fine_tuned_model(
+        self,
+        model_id: str,
+        document_content: str,
+        document_type: str
+    ) -> Dict[str, Any]:
+        """
+        Invoke fine-tuned model for inference
+        Calls Azure OpenAI with custom fine-tuned model
+        """
+        try:
+            import httpx
+            from ...shared.http import get_http_client
+            
+            # Get fine-tuned model deployment name
+            deployment_name = await self._get_model_deployment_name(model_id)
+            
+            # Prepare prompt for the model
+            prompt = self._create_evaluation_prompt(document_content, document_type)
+            
+            # Call Azure OpenAI with fine-tuned model
+            client = get_http_client()
+            response = await client.post(
+                f"{self.config.openai_endpoint}/openai/deployments/{deployment_name}/completions",
+                headers={
+                    "api-key": self.config.openai_api_key,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "prompt": prompt,
+                    "max_tokens": 1000,
+                    "temperature": 0.0  # Deterministic for evaluation
+                },
+                timeout=30.0
+            )
+            response.raise_for_status()
+            
+            # Parse model output
+            model_output = response.json()["choices"][0]["text"]
+            extracted_data = self._parse_model_output(model_output, document_type)
+            
+            return extracted_data
+            
+        except Exception as e:
+            logger.error(f"Error invoking model {model_id}: {e}")
+            raise
+    
+    async def _get_model_deployment_name(self, model_id: str) -> str:
+        """Get Azure OpenAI deployment name for fine-tuned model"""
+        try:
+            query = """
+                SELECT deployment_name
+                FROM fine_tuned_models
+                WHERE id = ? AND status = 'deployed'
+            """
+            results = self.sql_service.execute_query(query, (model_id,))
+            
+            if results:
+                return results[0]["deployment_name"]
+            else:
+                raise ValueError(f"No deployed model found for {model_id}")
+                
+        except Exception as e:
+            logger.error(f"Error getting model deployment: {e}")
+            raise
+    
+    def _create_evaluation_prompt(self, document_content: str, document_type: str) -> str:
+        """Create evaluation prompt for the model"""
+        if document_type == "invoice":
+            return f"""Extract invoice data from the following document:
+
+{document_content}
+
+Extract the following fields and return as JSON:
+- invoice_number
+- invoice_date
+- vendor_name
+- total_amount
+- line_items (array)
+
+JSON output:"""
+        else:
+            return f"""Extract key information from the following {document_type}:
+
+{document_content}
+
+Return extracted data as JSON."""
+    
+    def _parse_model_output(self, output: str, document_type: str) -> Dict[str, Any]:
+        """Parse model output into structured data"""
+        try:
+            import json
+            # Try to extract JSON from output
+            json_start = output.find("{")
+            json_end = output.rfind("}") + 1
+            if json_start >= 0 and json_end > json_start:
+                json_str = output[json_start:json_end]
+                return json.loads(json_str)
+            else:
+                logger.warning(f"Could not find JSON in model output: {output}")
+                return {}
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing model output as JSON: {e}")
+            return {}
+    
+    def _calculate_accuracy_metrics(
+        self,
+        predicted: Dict[str, Any],
+        ground_truth: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Calculate accuracy metrics by comparing predicted vs ground truth
+        """
+        if not ground_truth:
+            # No ground truth available, use confidence heuristics
+            field_count = len(predicted)
+            return {
+                "confidence": min(1.0, field_count / 5.0),  # Assuming 5 key fields
+                "completeness": min(1.0, field_count / 5.0),
+                "validation_passed": field_count >= 3,
+                "fully_automated": field_count >= 4,
+                "accuracy": 0.5  # Unknown without ground truth
+            }
+        
+        # Calculate field-level accuracy
+        total_fields = len(ground_truth)
+        correct_fields = 0
+        extracted_fields = 0
+        
+        for field, true_value in ground_truth.items():
+            if field in predicted:
+                extracted_fields += 1
+                pred_value = predicted[field]
+                
+                # Normalize and compare
+                if self._values_match(pred_value, true_value):
+                    correct_fields += 1
+        
+        # Calculate metrics
+        accuracy = correct_fields / total_fields if total_fields > 0 else 0.0
+        completeness = extracted_fields / total_fields if total_fields > 0 else 0.0
+        confidence = accuracy  # Confidence based on accuracy
+        
+        # Determine validation and automation status
+        validation_passed = accuracy >= 0.85
+        fully_automated = accuracy >= 0.90 and completeness >= 0.95
+        
         return {
-            "document_id": document_id,
-            "model_id": model_id,
-            "confidence": 0.92,
-            "completeness": 0.95,
-            "validation_passed": True,
-            "fully_automated": True,
-            "processing_time": 3.5
+            "confidence": confidence,
+            "completeness": completeness,
+            "validation_passed": validation_passed,
+            "fully_automated": fully_automated,
+            "accuracy": accuracy
         }
+    
+    def _values_match(self, predicted: Any, ground_truth: Any) -> bool:
+        """Check if predicted value matches ground truth"""
+        # Normalize strings
+        if isinstance(predicted, str) and isinstance(ground_truth, str):
+            return predicted.strip().lower() == ground_truth.strip().lower()
+        
+        # Numeric comparison with tolerance
+        if isinstance(predicted, (int, float)) and isinstance(ground_truth, (int, float)):
+            return abs(float(predicted) - float(ground_truth)) < 0.01
+        
+        # Direct comparison
+        return predicted == ground_truth
     
     def _estimate_cost_per_document(self, model_name: str, processing_time: float) -> float:
         """Estimate cost per document"""
