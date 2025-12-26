@@ -25,6 +25,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from ...shared.config.settings import config_manager
 from ...shared.health import get_health_service
+from ...shared.resilience.circuit_breaker import CircuitBreakerRegistry
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -339,6 +340,66 @@ async def readiness_probe():
     
     status_code = 200 if result["status"] == "healthy" else 503
     return JSONResponse(content=result, status_code=status_code)
+
+
+@app.get("/circuit-breakers")
+async def get_circuit_breakers():
+    """
+    Get status of all circuit breakers
+    Useful for monitoring and debugging
+    """
+    states = CircuitBreakerRegistry.get_all_states()
+    
+    # Calculate overall health
+    total = len(states)
+    open_count = sum(1 for s in states.values() if s["state"] == "open")
+    half_open_count = sum(1 for s in states.values() if s["state"] == "half_open")
+    
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "summary": {
+            "total_breakers": total,
+            "open": open_count,
+            "half_open": half_open_count,
+            "closed": total - open_count - half_open_count,
+            "health": "degraded" if open_count > 0 else "healthy"
+        },
+        "breakers": states
+    }
+
+
+@app.post("/circuit-breakers/{breaker_name}/reset")
+async def reset_circuit_breaker(breaker_name: str):
+    """
+    Manually reset a circuit breaker to CLOSED state
+    Useful for recovery after fixing issues
+    """
+    breakers = CircuitBreakerRegistry.get_all()
+    
+    if breaker_name not in breakers:
+        raise HTTPException(status_code=404, detail=f"Circuit breaker '{breaker_name}' not found")
+    
+    breaker = breakers[breaker_name]
+    breaker.reset()
+    
+    return {
+        "message": f"Circuit breaker '{breaker_name}' reset to CLOSED",
+        "state": breaker.get_state()
+    }
+
+
+@app.post("/circuit-breakers/reset-all")
+async def reset_all_circuit_breakers():
+    """
+    Reset all circuit breakers to CLOSED state
+    Use with caution - only after fixing underlying issues
+    """
+    CircuitBreakerRegistry.reset_all()
+    
+    return {
+        "message": "All circuit breakers reset to CLOSED",
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 # Service routing endpoints
 @app.api_route("/documents/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
