@@ -11,6 +11,7 @@ import pandas as pd
 
 from ...shared.storage.sql_service import SQLService
 from ...shared.config.settings import config_manager
+from ...shared.config.enhanced_settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +50,22 @@ class AutomationScoringEngine:
             config = config_manager.get_azure_config()
             self.sql_service = SQLService(config.sql_connection_string)
         
-        self.automation_threshold = 0.85  # 85% score = fully automated
-        self.confidence_threshold = 0.90  # 90% confidence
-        self.completeness_threshold = 0.95  # 95% completeness
+        # Get automation configuration from centralized settings
+        settings = get_settings()
+        self.automation_threshold = settings.automation.threshold
+        self.confidence_threshold = settings.automation.confidence_threshold
+        self.completeness_threshold = settings.automation.completeness_threshold
+        self.automation_goal = settings.automation.goal
+        self.validation_threshold = settings.automation.validation_threshold
+        self.manual_intervention_threshold = settings.automation.manual_intervention_threshold
+        
+        logger.info(
+            f"AutomationScoringEngine initialized with thresholds: "
+            f"automation={self.automation_threshold}, "
+            f"confidence={self.confidence_threshold}, "
+            f"completeness={self.completeness_threshold}, "
+            f"goal={self.automation_goal}"
+        )
     
     def calculate_invoice_score(
         self,
@@ -239,8 +253,8 @@ class AutomationScoringEngine:
             fully_automated = len(df[~df['requires_review']])
             requires_review = len(df[df['requires_review']])
             
-            # Manual intervention is when automation score < 0.7
-            manual_intervention = len(df[df['automation_score'] < 0.7])
+            # Manual intervention is when automation score < threshold
+            manual_intervention = len(df[df['automation_score'] < self.manual_intervention_threshold])
             
             # Calculate averages
             average_confidence = df['confidence_score'].mean()
@@ -321,8 +335,9 @@ class AutomationScoringEngine:
             raise
     
     def check_automation_goal(self, automation_rate: float) -> Dict[str, Any]:
-        """Check if automation goal (90%) is being met"""
-        goal = 90.0
+        """Check if automation goal is being met"""
+        # Use configurable goal instead of hardcoded value
+        goal = self.automation_goal * 100  # Convert from 0.90 to 90.0
         is_met = automation_rate >= goal
         gap = goal - automation_rate if not is_met else 0.0
         
@@ -378,11 +393,12 @@ class AutomationScoringEngine:
                 })
             
             # Check validation pass rate
-            if metrics.validation_pass_rate < 85.0:
+            validation_threshold_pct = self.validation_threshold * 100
+            if metrics.validation_pass_rate < validation_threshold_pct:
                 insights.append({
                     "type": "validation",
                     "priority": "medium",
-                    "message": f"Validation pass rate ({metrics.validation_pass_rate:.1f}%) is below 85%",
+                    "message": f"Validation pass rate ({metrics.validation_pass_rate:.1f}%) is below {validation_threshold_pct:.0f}%",
                     "recommendation": "Review and optimize data quality validation rules"
                 })
             
@@ -398,11 +414,13 @@ class AutomationScoringEngine:
             
             # Check manual intervention rate
             manual_rate = (metrics.manual_intervention / metrics.total_processed) * 100 if metrics.total_processed > 0 else 0
-            if manual_rate > 15.0:
+            # Calculate acceptable manual intervention rate from automation goal
+            max_manual_rate = (1.0 - self.automation_goal) * 100
+            if manual_rate > max_manual_rate:
                 insights.append({
                     "type": "manual_intervention",
                     "priority": "medium",
-                    "message": f"{manual_rate:.1f}% of invoices require significant manual intervention",
+                    "message": f"{manual_rate:.1f}% of invoices require significant manual intervention (threshold: {max_manual_rate:.1f}%)",
                     "recommendation": "Identify common patterns in low-scoring invoices and create targeted training data"
                 })
             
