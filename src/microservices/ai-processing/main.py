@@ -579,8 +579,8 @@ from azure.servicebus import ServiceBusClient, ServiceBusMessage
 # Cosmos DB removed - using Azure SQL Database
 from azure.storage.blob import BlobServiceClient
 
-from ...shared.config.settings import config_manager
-from ...shared.events.event_sourcing import (
+from src.shared.config.settings import config_manager
+from src.shared.events.event_sourcing import (
     DocumentProcessingStartedEvent, DocumentProcessingCompletedEvent,
     DocumentProcessingFailedEvent, DocumentClassifiedEvent, EventBus
 )
@@ -595,7 +595,7 @@ from .fine_tuning_websocket import router as fine_tuning_ws_router
 from .fine_tuning_database import initialize_fine_tuning_database
 from .langchain_orchestration import LangChainOrchestrator, DocumentProcessingAgent
 from .llmops_automation import LLMOpsAutomationTracker
-from ...shared.routing import get_document_router, ProcessingMode, ComplexityLevel
+from src.shared.routing import get_document_router, ProcessingMode, ComplexityLevel
 
 # Initialize FastAPI app
 app = FastAPI(

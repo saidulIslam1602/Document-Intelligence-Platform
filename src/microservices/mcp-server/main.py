@@ -540,7 +540,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 import httpx
 
-from ...shared.config.settings import config_manager
+from src.shared.config.settings import config_manager
 from .mcp_tools import MCPToolRegistry
 from .mcp_resources import MCPResourceManager
 

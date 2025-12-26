@@ -5,7 +5,7 @@
 param resourceGroupName string = 'document-intelligence-rg'
 
 @description('The location for all resources')
-param location string = resourceGroup().location
+param location string = 'westus2'
 
 @description('Environment name (dev, staging, prod)')
 @allowed(['dev', 'staging', 'prod'])
@@ -22,6 +22,8 @@ param enablePublicAccess bool = false
 
 // Variables
 var resourcePrefix = '${appNamePrefix}-${environment}'
+var uniqueSuffix = substring(uniqueString(resourceGroup().id), 0, 6)
+var storagePrefix = '${appNamePrefix}${environment}${uniqueSuffix}'
 var tags = {
   Environment: environment
   Application: 'Document Intelligence Platform'
@@ -33,7 +35,7 @@ var tags = {
 // STORAGE ACCOUNT
 // =============================================
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: '${resourcePrefix}storage${uniqueString(resourceGroup().id)}'
+  name: '${storagePrefix}st'
   location: location
   tags: tags
   sku: {
@@ -51,9 +53,15 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
+// Blob Service (required for containers)
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
 // Blob containers
 resource documentsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: storageAccount::blobServices
+  parent: blobService
   name: 'documents'
   properties: {
     publicAccess: 'None'
@@ -61,7 +69,7 @@ resource documentsContainer 'Microsoft.Storage/storageAccounts/blobServices/cont
 }
 
 resource checkpointsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: storageAccount::blobServices
+  parent: blobService
   name: 'checkpoints'
   properties: {
     publicAccess: 'None'
@@ -73,7 +81,7 @@ resource checkpointsContainer 'Microsoft.Storage/storageAccounts/blobServices/co
 // AZURE SQL DATABASE
 // =============================================
 resource sqlServer 'Microsoft.Sql/servers@2023-05-01-preview' = {
-  name: '${resourcePrefix}-sqlserver'
+  name: '${resourcePrefix}sql${uniqueString(resourceGroup().id)}'
   location: location
   tags: tags
   properties: {
@@ -97,7 +105,6 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
   properties: {
     collation: 'SQL_Latin1_General_CP1_CI_AS'
     maxSizeBytes: environment == 'dev' ? 2147483648 : 107374182400 // 2GB for dev, 100GB for prod
-    requestedServiceObjectiveName: environment == 'dev' ? 'Basic' : 'S2'
   }
 }
 
@@ -115,7 +122,7 @@ resource sqlFirewallRule 'Microsoft.Sql/servers/firewallRules@2023-05-01-preview
 // AZURE DATA LAKE STORAGE GEN2
 // =============================================
 resource dataLakeStorageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: '${resourcePrefix}datalake${uniqueString(resourceGroup().id)}'
+  name: '${storagePrefix}dl'
   location: location
   tags: tags
   sku: {
@@ -134,9 +141,15 @@ resource dataLakeStorageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' =
   }
 }
 
+// Data Lake Blob Service
+resource dataLakeBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01' = {
+  parent: dataLakeStorageAccount
+  name: 'default'
+}
+
 // Data Lake containers
 resource rawDataContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: dataLakeStorageAccount::blobServices
+  parent: dataLakeBlobService
   name: 'raw-data'
   properties: {
     publicAccess: 'None'
@@ -147,7 +160,7 @@ resource rawDataContainer 'Microsoft.Storage/storageAccounts/blobServices/contai
 }
 
 resource processedDataContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: dataLakeStorageAccount::blobServices
+  parent: dataLakeBlobService
   name: 'processed-data'
   properties: {
     publicAccess: 'None'
@@ -158,7 +171,7 @@ resource processedDataContainer 'Microsoft.Storage/storageAccounts/blobServices/
 }
 
 resource analyticsDataContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: dataLakeStorageAccount::blobServices
+  parent: dataLakeBlobService
   name: 'analytics-data'
   properties: {
     publicAccess: 'None'
@@ -169,7 +182,7 @@ resource analyticsDataContainer 'Microsoft.Storage/storageAccounts/blobServices/
 }
 
 resource dataWarehouseContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: dataLakeStorageAccount::blobServices
+  parent: dataLakeBlobService
   name: 'data-warehouse'
   properties: {
     publicAccess: 'None'
@@ -234,7 +247,7 @@ resource documentProcessingQueue 'Microsoft.ServiceBus/namespaces/queues@2022-10
     maxSizeInMegabytes: 1024
     defaultMessageTimeToLive: 'P14D'
     lockDuration: 'PT5M'
-    enableDeadLetteringOnMessageExpiration: true
+    deadLetteringOnMessageExpiration: true
     enableBatchedOperations: true
   }
 }
@@ -246,7 +259,7 @@ resource batchProcessingQueue 'Microsoft.ServiceBus/namespaces/queues@2022-10-01
     maxSizeInMegabytes: 1024
     defaultMessageTimeToLive: 'P14D'
     lockDuration: 'PT5M'
-    enableDeadLetteringOnMessageExpiration: true
+    deadLetteringOnMessageExpiration: true
     enableBatchedOperations: true
   }
 }
@@ -269,12 +282,6 @@ resource apiManagement 'Microsoft.ApiManagement/service@2023-05-01-preview' = {
     publicNetworkAccess: 'Enabled'
     virtualNetworkType: 'None'
     disableGateway: false
-    enableClientCertificate: false
-    natGatewayState: 'Disabled'
-    publicIpAddressId: null
-    restore: false
-    apiVersionConstraint: null
-    minApiVersion: null
     additionalLocations: []
     customProperties: {
       'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10': 'false'
@@ -538,13 +545,13 @@ resource searchService 'Microsoft.Search/searchServices@2023-11-01' = {
   location: location
   tags: tags
   sku: {
-    name: environment == 'dev' ? 'Free' : 'Standard'
+    name: environment == 'dev' ? 'free' : 'standard'
   }
   properties: {
     replicaCount: environment == 'dev' ? 1 : 3
     partitionCount: environment == 'dev' ? 1 : 2
-    hostingMode: 'Default'
-    publicNetworkAccess: 'Enabled'
+    hostingMode: 'default'
+    publicNetworkAccess: 'enabled'
   }
 }
 
@@ -593,8 +600,8 @@ resource documentIngestionApp 'Microsoft.App/containerApps@2023-05-01' = {
       }
       registries: [
         {
-          server: '${resourcePrefix}acr.azurecr.io'
-          username: '${resourcePrefix}acr'
+          server: '${appNamePrefix}${environment}acr${uniqueSuffix}.azurecr.io'
+          username: '${appNamePrefix}${environment}acr${uniqueSuffix}'
           passwordSecretRef: 'acr-password'
         }
       ]
@@ -606,7 +613,7 @@ resource documentIngestionApp 'Microsoft.App/containerApps@2023-05-01' = {
         // Cosmos DB removed - using Azure SQL Database
         {
           name: 'storage-connection-string'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
         }
         {
           name: 'event-hub-connection-string'
@@ -694,8 +701,8 @@ resource aiProcessingApp 'Microsoft.App/containerApps@2023-05-01' = {
       }
       registries: [
         {
-          server: '${resourcePrefix}acr.azurecr.io'
-          username: '${resourcePrefix}acr'
+          server: '${appNamePrefix}${environment}acr${uniqueSuffix}.azurecr.io'
+          username: '${appNamePrefix}${environment}acr${uniqueSuffix}'
           passwordSecretRef: 'acr-password'
         }
       ]
@@ -723,7 +730,7 @@ resource aiProcessingApp 'Microsoft.App/containerApps@2023-05-01' = {
         }
         {
           name: 'cognitive-search-endpoint'
-          value: searchService.properties.searchEndpoint
+          value: 'https://${searchService.name}.search.windows.net'
         }
         {
           name: 'cognitive-search-key'
@@ -807,8 +814,8 @@ resource analyticsApp 'Microsoft.App/containerApps@2023-05-01' = {
       }
       registries: [
         {
-          server: '${resourcePrefix}acr.azurecr.io'
-          username: '${resourcePrefix}acr'
+          server: '${appNamePrefix}${environment}acr${uniqueSuffix}.azurecr.io'
+          username: '${appNamePrefix}${environment}acr${uniqueSuffix}'
           passwordSecretRef: 'acr-password'
         }
       ]
@@ -880,8 +887,8 @@ resource apiGatewayApp 'Microsoft.App/containerApps@2023-05-01' = {
       }
       registries: [
         {
-          server: '${resourcePrefix}acr.azurecr.io'
-          username: '${resourcePrefix}acr'
+          server: '${appNamePrefix}${environment}acr${uniqueSuffix}.azurecr.io'
+          username: '${appNamePrefix}${environment}acr${uniqueSuffix}'
           passwordSecretRef: 'acr-password'
         }
       ]
@@ -976,7 +983,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
 
 // Container Registry
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
-  name: '${resourcePrefix}acr'
+  name: '${appNamePrefix}${environment}acr${uniqueSuffix}'
   location: location
   tags: tags
   sku: {
@@ -1041,7 +1048,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
       {
         name: 'default'
         properties: {
-          addressPrefix: '10.0.1.0/24'
+          addressPrefix: '10.0.0.0/23'
         }
       }
     ]
@@ -1079,8 +1086,8 @@ resource aiChatApp 'Microsoft.App/containerApps@2023-05-01' = {
       }
       registries: [
         {
-          server: '${resourcePrefix}acr.azurecr.io'
-          username: '${resourcePrefix}acr'
+          server: '${appNamePrefix}${environment}acr${uniqueSuffix}.azurecr.io'
+          username: '${appNamePrefix}${environment}acr${uniqueSuffix}'
           passwordSecretRef: 'acr-password'
         }
       ]
@@ -1117,11 +1124,9 @@ resource aiChatApp 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'COGNITIVE_SEARCH_KEY'
               secretRef: 'cognitive-search-key'
             }
-        // Cosmos DB removed - using Azure SQL Database
-            }
             {
               name: 'STORAGE_CONNECTION_STRING'
-              value: storageAccount.primaryEndpoints.blob
+              value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
             }
           ]
         }
@@ -1160,7 +1165,7 @@ output formRecognizerEndpoint string = formRecognizerAccount.properties.endpoint
 output formRecognizerKey string = formRecognizerAccount.listKeys().key1
 output openaiEndpoint string = openaiAccount.properties.endpoint
 output openaiKey string = openaiAccount.listKeys().key1
-output searchEndpoint string = searchService.properties.searchEndpoint
+output searchEndpoint string = 'https://${searchService.name}.search.windows.net'
 output searchKey string = searchService.listAdminKeys().primaryKey
 output applicationInsightsConnectionString string = applicationInsights.properties.ConnectionString
 output keyVaultUri string = keyVault.properties.vaultUri

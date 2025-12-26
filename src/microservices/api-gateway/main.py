@@ -665,10 +665,10 @@ from azure.identity import DefaultAzureCredential
 import httpx
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ...shared.config.settings import config_manager
-from ...shared.health import get_health_service
-from ...shared.resilience.circuit_breaker import CircuitBreakerRegistry
-from ...shared.rate_limiting import RateLimiterRegistry
+from src.shared.config.settings import config_manager
+from src.shared.health import get_health_service
+from src.shared.resilience.circuit_breaker import CircuitBreakerRegistry
+from src.shared.rate_limiting import RateLimiterRegistry
 
 # Initialize FastAPI app
 app = FastAPI(

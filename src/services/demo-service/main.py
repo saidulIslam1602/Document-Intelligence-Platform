@@ -13,8 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 
-from ...shared.config.settings import config_manager
-from ...shared.auth.auth_service import auth_service, User
+from src.shared.config.settings import config_manager
+from src.shared.auth.auth_service import auth_service, User
 from .poc_generator import PoCGenerator, PoCInstance, PoCScenario
 
 # Initialize FastAPI app

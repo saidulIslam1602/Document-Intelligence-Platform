@@ -12,8 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from ...shared.monitoring.performance_monitor import performance_monitor
-from ...shared.cache.redis_cache import cache_service
+from src.shared.monitoring.performance_monitor import performance_monitor
+from src.shared.cache.redis_cache import cache_service
 
 # Initialize FastAPI app
 app = FastAPI(

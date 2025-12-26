@@ -468,11 +468,11 @@ from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
 
-from ...shared.config.settings import config_manager
-from ...shared.storage.sql_service import SQLService
-from ...shared.auth.auth_service import get_current_user_id, User
-from ...shared.utils.error_handler import handle_validation_error, ErrorHandler
-from ...shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
+from src.shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
+from src.shared.auth.auth_service import get_current_user_id, User
+from src.shared.utils.error_handler import handle_validation_error, ErrorHandler
+from src.shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
 # Import AI processing services
 from ..ai_processing.openai_service import OpenAIService
 from ..ai_processing.form_recognizer_service import FormRecognizerService

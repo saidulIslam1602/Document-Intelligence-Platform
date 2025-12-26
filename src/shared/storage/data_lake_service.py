@@ -8,12 +8,27 @@ class DataLakeService:
     """Service for Azure Data Lake Storage Gen2 operations"""
     
     def __init__(self, connection_string: str):
-        self.service_client = DataLakeServiceClient.from_connection_string(connection_string)
         self.logger = logging.getLogger(__name__)
+        self.service_client = None
+        self.enabled = False
+        
+        if connection_string and connection_string.strip():
+            try:
+                self.service_client = DataLakeServiceClient.from_connection_string(connection_string)
+                self.enabled = True
+                self.logger.info("Data Lake Service initialized successfully")
+            except Exception as e:
+                self.logger.warning(f"Data Lake Service not available: {str(e)}")
+        else:
+            self.logger.info("Data Lake Service disabled (no connection string provided)")
     
     def upload_file(self, file_system: str, file_path: str, data: bytes, 
                    metadata: Optional[dict] = None) -> bool:
         """Upload a file to Data Lake"""
+        if not self.enabled:
+            self.logger.debug("Data Lake Service not enabled, skipping upload")
+            return False
+        
         try:
             file_client = self.service_client.get_file_client(
                 file_system=file_system, 
@@ -36,6 +51,10 @@ class DataLakeService:
     
     def download_file(self, file_system: str, file_path: str) -> Optional[bytes]:
         """Download a file from Data Lake"""
+        if not self.enabled:
+            self.logger.debug("Data Lake Service not enabled, skipping download")
+            return None
+        
         try:
             file_client = self.service_client.get_file_client(
                 file_system=file_system, 

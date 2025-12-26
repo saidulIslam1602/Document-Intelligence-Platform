@@ -410,9 +410,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .data_validator import data_validator, ValidationRequest, QualityReportResponse, QualityLevel
-from ...shared.config.settings import config_manager
-from ...shared.storage.sql_service import SQLService
-from ...shared.cache.redis_cache import cache_service, cache_result
+from src.shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
+from src.shared.cache.redis_cache import cache_service, cache_result
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -701,8 +701,8 @@ async def get_quality_alerts():
     """Get active data quality alerts"""
     try:
         # Query actual alerts from database
-        from ...shared.storage.sql_service import SQLService
-        from ...shared.config.settings import config_manager
+        from src.shared.storage.sql_service import SQLService
+        from src.shared.config.settings import config_manager
         
         config = config_manager.get_azure_config()
         sql_service = SQLService(config.sql_connection_string)

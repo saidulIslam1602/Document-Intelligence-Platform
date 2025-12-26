@@ -12,9 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .etl_pipeline import etl_pipeline, PipelineExecutionRequest, PipelineStatusResponse, PipelineStatus
-from ...shared.config.settings import config_manager
-from ...shared.storage.sql_service import SQLService
-from ...shared.cache.redis_cache import cache_service, cache_result
+from src.shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
+from src.shared.cache.redis_cache import cache_service, cache_result
 
 # Initialize FastAPI app
 app = FastAPI(

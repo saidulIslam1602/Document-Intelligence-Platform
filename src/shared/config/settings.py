@@ -57,20 +57,6 @@ class AzureConfig:
     sql_server_name: str
     sql_database_name: str
     
-    # Migration Databases
-    teradata_host: str = ""
-    teradata_user: str = ""
-    teradata_password: str = ""
-    teradata_database: str = ""
-    netezza_host: str = ""
-    netezza_user: str = ""
-    netezza_password: str = ""
-    netezza_database: str = ""
-    oracle_host: str = ""
-    oracle_user: str = ""
-    oracle_password: str = ""
-    oracle_database: str = ""
-    
     # Event Services
     event_hub_connection_string: str
     service_bus_connection_string: str
@@ -83,6 +69,20 @@ class AzureConfig:
     # Monitoring
     application_insights_connection_string: str
     log_analytics_workspace_id: str
+    
+    # Migration Databases (with defaults)
+    teradata_host: str = ""
+    teradata_user: str = ""
+    teradata_password: str = ""
+    teradata_database: str = ""
+    netezza_host: str = ""
+    netezza_user: str = ""
+    netezza_password: str = ""
+    netezza_database: str = ""
+    oracle_host: str = ""
+    oracle_user: str = ""
+    oracle_password: str = ""
+    oracle_database: str = ""
 
 @dataclass
 class DocumentProcessingConfig:

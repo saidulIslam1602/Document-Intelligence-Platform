@@ -493,10 +493,21 @@ class SQLService:
     def __init__(self, connection_string: str):
         self.connection_string = connection_string
         self.logger = logging.getLogger(__name__)
+        self.enabled = bool(connection_string and connection_string.strip())
+        
+        if not self.enabled:
+            self.logger.info("SQL Service disabled (no connection string provided)")
+        else:
+            self.logger.info("SQL Service initialized")
     
     @contextmanager
     def get_connection(self):
         """Context manager for database connections"""
+        if not self.enabled:
+            self.logger.debug("SQL Service not enabled, returning None connection")
+            yield None
+            return
+        
         conn = None
         try:
             conn = pyodbc.connect(self.connection_string)

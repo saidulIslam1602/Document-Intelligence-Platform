@@ -15,9 +15,9 @@ from .lineage_tracker import (
     lineage_tracker, AssetRegistrationRequest, LineageRelationshipRequest, 
     AssetSearchRequest, DataAssetType, LineageType
 )
-from ...shared.config.settings import config_manager
-from ...shared.storage.sql_service import SQLService
-from ...shared.cache.redis_cache import cache_service, cache_result
+from src.shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
+from src.shared.cache.redis_cache import cache_service, cache_result
 
 # Initialize FastAPI app
 app = FastAPI(

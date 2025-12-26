@@ -522,14 +522,14 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.utils import PlotlyJSONEncoder
 
-from ...shared.config.settings import config_manager
-from ...shared.events.event_sourcing import EventBus
-from ...shared.storage.data_lake_service import DataLakeService
-from ...shared.storage.sql_service import SQLService
-from ...shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
-from ...shared.services.powerbi_service import powerbi_service
-from ...shared.monitoring.advanced_monitoring import monitoring_service
-from ...shared.health import get_health_service
+from src.shared.config.settings import config_manager
+from src.shared.events.event_sourcing import EventBus
+from src.shared.storage.data_lake_service import DataLakeService
+from src.shared.storage.sql_service import SQLService
+from src.shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
+from src.shared.services.powerbi_service import powerbi_service
+from src.shared.monitoring.advanced_monitoring import monitoring_service
+from src.shared.health import get_health_service
 from .automation_scoring import AutomationScoringEngine
 
 # Initialize FastAPI app
@@ -1288,8 +1288,8 @@ async def get_active_alerts() -> List[Dict[str, Any]]:
     """Get active alerts"""
     try:
         # Query actual alerts from database
-        from ...shared.storage.sql_service import SQLService
-        from ...shared.config.settings import config_manager
+        from src.shared.storage.sql_service import SQLService
+        from src.shared.config.settings import config_manager
         
         config = config_manager.get_azure_config()
         sql_service = SQLService(config.sql_connection_string)
@@ -1518,7 +1518,7 @@ async def get_active_alerts():
 async def create_alert_rule(rule: Dict[str, Any]):
     """Create a custom alert rule"""
     try:
-        from ...shared.monitoring.advanced_monitoring import AlertRule, AlertSeverity
+        from src.shared.monitoring.advanced_monitoring import AlertRule, AlertSeverity
         
         alert_rule = AlertRule(
             name=rule["name"],

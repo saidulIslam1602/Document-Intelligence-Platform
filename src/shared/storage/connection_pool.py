@@ -15,8 +15,6 @@ from azure.storage.filedatalake import DataLakeServiceClient
 from azure.eventhub import EventHubProducerClient
 from azure.servicebus import ServiceBusClient
 
-from .sql_service import SQLService
-from .data_lake_service import DataLakeService
 from ..config.settings import config_manager
 
 class ConnectionPoolManager:

@@ -14,8 +14,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 
-from ...shared.config.settings import config_manager
-from ...shared.auth.auth_service import auth_service, User
+from src.shared.config.settings import config_manager
+from src.shared.auth.auth_service import auth_service, User
 from .teradata_migrator import TeradataMigrator, MigrationJob, MigrationStatus
 from .netezza_migrator import NetezzaMigrator
 from .schema_converter import SchemaConverter, DatabaseType
