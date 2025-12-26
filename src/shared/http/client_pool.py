@@ -4,9 +4,11 @@ Efficient connection reuse for all HTTP requests across microservices
 """
 
 import httpx
+import asyncio
 import logging
 from typing import Optional, Dict, Any
 from ..config.enhanced_settings import get_settings
+from ..resilience.retry import retry_with_backoff, retry_on_http_error
 
 logger = logging.getLogger(__name__)
 
@@ -171,20 +173,20 @@ class HTTPClient:
         pass
 
 
-# Example usage with retry and error handling
+# HTTP request helpers with automatic retry
 async def make_request_with_retry(
     method: str,
     url: str,
-    max_retries: int = 3,
+    max_retries: Optional[int] = None,
     **kwargs
 ) -> httpx.Response:
     """
-    Make HTTP request with automatic retry
+    Make HTTP request with automatic retry using exponential backoff
     
     Args:
         method: HTTP method (GET, POST, etc.)
         url: Request URL
-        max_retries: Maximum number of retries
+        max_retries: Maximum number of retries (default from config)
         **kwargs: Additional arguments for httpx request
         
     Returns:
@@ -192,28 +194,54 @@ async def make_request_with_retry(
         
     Raises:
         httpx.HTTPError: If request fails after all retries
+        
+    Example:
+        response = await make_request_with_retry("GET", "https://api.example.com/data")
+        data = response.json()
     """
     client = get_http_client()
-    last_error = None
     
-    for attempt in range(max_retries):
-        try:
-            response = await client.request(method, url, **kwargs)
-            response.raise_for_status()
-            return response
-        except httpx.HTTPError as e:
-            last_error = e
-            if attempt < max_retries - 1:
-                logger.warning(
-                    f"Request failed (attempt {attempt + 1}/{max_retries}): {str(e)}"
-                )
-                # Exponential backoff
-                import asyncio
-                await asyncio.sleep(2 ** attempt)
-            else:
-                logger.error(f"Request failed after {max_retries} attempts: {str(e)}")
+    async def _make_request():
+        response = await client.request(method, url, **kwargs)
+        response.raise_for_status()
+        return response
     
-    raise last_error
+    # Use retry with exponential backoff
+    return await retry_with_backoff(
+        _make_request,
+        max_retries=max_retries,
+        retryable_exceptions=(
+            httpx.HTTPError,
+            httpx.ConnectError,
+            httpx.TimeoutException
+        )
+    )
+
+
+# Convenience methods for common HTTP methods with retry
+async def get_with_retry(url: str, **kwargs) -> httpx.Response:
+    """GET request with automatic retry"""
+    return await make_request_with_retry("GET", url, **kwargs)
+
+
+async def post_with_retry(url: str, **kwargs) -> httpx.Response:
+    """POST request with automatic retry"""
+    return await make_request_with_retry("POST", url, **kwargs)
+
+
+async def put_with_retry(url: str, **kwargs) -> httpx.Response:
+    """PUT request with automatic retry"""
+    return await make_request_with_retry("PUT", url, **kwargs)
+
+
+async def delete_with_retry(url: str, **kwargs) -> httpx.Response:
+    """DELETE request with automatic retry"""
+    return await make_request_with_retry("DELETE", url, **kwargs)
+
+
+async def patch_with_retry(url: str, **kwargs) -> httpx.Response:
+    """PATCH request with automatic retry"""
+    return await make_request_with_retry("PATCH", url, **kwargs)
 
 
 # Health check for HTTP client pool

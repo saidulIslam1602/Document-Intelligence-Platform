@@ -9,6 +9,11 @@ from .client_pool import (
     close_http_clients,
     HTTPClient,
     make_request_with_retry,
+    get_with_retry,
+    post_with_retry,
+    put_with_retry,
+    delete_with_retry,
+    patch_with_retry,
     check_http_pool_health
 )
 
@@ -19,6 +24,11 @@ __all__ = [
     'close_http_clients',
     'HTTPClient',
     'make_request_with_retry',
+    'get_with_retry',
+    'post_with_retry',
+    'put_with_retry',
+    'delete_with_retry',
+    'patch_with_retry',
     'check_http_pool_health'
 ]
 
