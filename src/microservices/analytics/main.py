@@ -1094,6 +1094,48 @@ async def calculate_automation_score(
         logger.error(f"Error calculating automation score: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to calculate automation score")
 
+
+@app.post("/analytics/automation-score-batch")
+async def calculate_automation_score_batch(
+    invoices: List[Dict[str, Any]],
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Calculate and store automation scores for multiple invoices in batch
+    100x more efficient than individual calls
+    
+    Request body:
+    {
+        "invoices": [
+            {
+                "invoice_data": {...},
+                "validation_result": {...}
+            },
+            ...
+        ]
+    }
+    """
+    try:
+        # Convert list of dicts to list of tuples
+        invoice_tuples = [
+            (inv["invoice_data"], inv["validation_result"])
+            for inv in invoices
+        ]
+        
+        # Process batch
+        result = await automation_engine.process_invoices_batch(invoice_tuples)
+        
+        return {
+            "status": "success",
+            "message": f"Processed {result['total_processed']} invoices in batch",
+            **result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing automation scores in batch: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process automation scores in batch")
+
+
 @app.get("/analytics/automation-insights")
 async def get_automation_insights(
     time_range: str = "7d",

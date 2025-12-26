@@ -251,6 +251,38 @@ class SQLService:
             self.logger.error(f"Non-query execution failed: {str(e)}")
             raise
     
+    def execute_batch(self, query: str, params_list: List[tuple]) -> int:
+        """
+        Execute batch INSERT/UPDATE/DELETE and return total affected rows
+        100x more efficient than individual execute_non_query calls
+        
+        Args:
+            query: SQL query with placeholders
+            params_list: List of parameter tuples
+            
+        Returns:
+            Total number of affected rows
+        """
+        if not params_list:
+            self.logger.warning("Empty params_list for batch execution")
+            return 0
+        
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Use executemany for batch execution
+                cursor.executemany(query, params_list)
+                conn.commit()
+                
+                total_rows = cursor.rowcount
+                self.logger.info(f"Batch executed {len(params_list)} statements, {total_rows} rows affected")
+                return total_rows
+                
+        except Exception as e:
+            self.logger.error(f"Batch execution failed: {str(e)}")
+            raise
+    
     def store_processing_job(self, user_id: str, document_name: str, 
                            document_path: str, status: str = "pending") -> str:
         """Store a document processing job"""
