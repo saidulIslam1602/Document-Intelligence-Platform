@@ -19,7 +19,8 @@ azure-monitor-query==1.2.0
 azure-search-documents==11.4.0
 
 # OpenAI
-openai==1.3.5
+# Note: Updated to 1.6.1+ to satisfy langchain-openai>=1.6.1 requirement
+openai==1.7.2
 
 # LangChain for orchestration
 langchain==0.1.0
