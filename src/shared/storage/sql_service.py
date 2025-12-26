@@ -1,3 +1,460 @@
+"""
+SQL Service - Database Abstraction Layer for Azure SQL Database
+
+This module provides a centralized, type-safe database abstraction layer for all
+data persistence operations in the Document Intelligence Platform. It handles
+connections, transactions, queries, and migrations for Azure SQL Database.
+
+Why Database Abstraction Layer?
+--------------------------------
+
+**Without Abstraction** (Direct SQL in every service):
+```python
+# Service 1
+conn = pyodbc.connect(connection_string)
+cursor = conn.cursor()
+cursor.execute("SELECT * FROM documents WHERE id = ?", doc_id)
+# No error handling, no connection pooling, no consistency
+
+# Service 2 (different approach)
+conn = pyodbc.connect(different_connection_string)
+result = conn.execute("SELECT * FROM documents WHERE id = " + doc_id)
+# SQL injection risk! Different patterns! No reusability!
+```
+
+**With SQLService** (This Module):
+```python
+# All services use same abstraction
+sql_service = SQLService(connection_string)
+document = await sql_service.execute_query(
+    "SELECT * FROM documents WHERE id = ?",
+    (doc_id,)  # Parameterized - SQL injection safe
+)
+
+Benefits:
+✓ Consistent error handling
+✓ Connection pooling (performance)
+✓ SQL injection prevention
+✓ Transaction management
+✓ Async support
+✓ Easy testing (mock layer)
+✓ Monitoring/logging
+```
+
+Architecture:
+-------------
+
+```
+┌────────────── All Microservices ─────────────────┐
+│                                                   │
+│  Document Ingestion  AI Processing  Analytics    │
+│  API Gateway         MCP Server     Auth Service │
+│                                                   │
+└────────────────────┬──────────────────────────────┘
+                     │ Uses SQLService
+                     ↓
+┌──────────────────────────────────────────────────────────┐
+│           SQLService (This Module)                       │
+│                                                          │
+│  ┌────────────── Query Methods ──────────────────┐     │
+│  │                                                │     │
+│  │  execute_query() - SELECT queries             │     │
+│  │  execute_non_query() - INSERT/UPDATE/DELETE   │     │
+│  │  execute_batch() - Batch operations           │     │
+│  │  execute_transaction() - Multi-statement      │     │
+│  │  execute_stored_procedure() - Stored procs    │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                          │
+│  ┌────────────── Specialized Methods ────────────┐     │
+│  │                                                │     │
+│  │  store_document() - Document metadata          │     │
+│  │  store_processing_job() - Job tracking         │     │
+│  │  store_analytics_metric() - Metrics            │     │
+│  │  store_automation_score() - Automation data    │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                          │
+│  ┌────────────── Connection Management ───────────┐     │
+│  │                                                │     │
+│  │  Connection Pool (10-50 connections)          │     │
+│  │  - Reuse connections (performance)             │     │
+│  │  - Automatic reconnection                      │     │
+│  │  - Health monitoring                           │     │
+│  │  - Timeout handling                            │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                          │
+│  ┌────────────── Async Support ────────────────────┐   │
+│  │                                                  │   │
+│  │  asyncio.to_thread() - Run sync DB in threads  │   │
+│  │  - Prevents blocking event loop                │   │
+│  │  - Maintains async APIs                         │   │
+│  │  - Better concurrency                           │   │
+│  └──────────────────────────────────────────────────┘   │
+└──────────────────────────┬───────────────────────────────┘
+                           │
+                           ↓
+┌──────────────────────────────────────────────────────────┐
+│         Azure SQL Database                               │
+│  - 14 tables (documents, jobs, metrics, etc.)           │
+│  - Indexes for performance                               │
+│  - Constraints for data integrity                        │
+│  - Stored procedures for complex logic                   │
+└──────────────────────────────────────────────────────────┘
+```
+
+Core Capabilities:
+------------------
+
+**1. Safe Query Execution**
+```python
+# Parameterized queries (SQL injection safe)
+result = await sql_service.execute_query(
+    "SELECT * FROM documents WHERE user_id = ? AND status = ?",
+    (user_id, "completed")
+)
+
+# NEVER do this (SQL injection risk):
+query = f"SELECT * FROM documents WHERE user_id = '{user_id}'"  # ❌ UNSAFE!
+
+# Always use parameterized:
+query = "SELECT * FROM documents WHERE user_id = ?"
+params = (user_id,)  # ✓ SAFE
+```
+
+**2. Transaction Management**
+```python
+# Atomic operations (all-or-nothing)
+async def transfer_document(doc_id, from_user, to_user):
+    async with sql_service.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Start transaction
+        cursor.execute("BEGIN TRANSACTION")
+        
+        try:
+            # Step 1: Remove from old user
+            cursor.execute(
+                "UPDATE documents SET user_id = ? WHERE id = ?",
+                (to_user, doc_id)
+            )
+            
+            # Step 2: Log transfer
+            cursor.execute(
+                "INSERT INTO audit_log (action, document_id) VALUES (?, ?)",
+                ("transfer", doc_id)
+            )
+            
+            # Commit if both succeed
+            conn.commit()
+        except Exception:
+            # Rollback if any fails
+            conn.rollback()
+            raise
+```
+
+**3. Connection Pooling**
+```python
+# Without pool: Create new connection every time (slow)
+conn = pyodbc.connect(connection_string)  # 50-100ms overhead
+
+# With pool: Reuse existing connection (fast)
+async with sql_service.get_pooled_connection() as conn:
+    # < 1ms overhead (connection already exists)
+    cursor = conn.cursor()
+    cursor.execute(query)
+
+Performance Impact:
+- Without pool: 100 queries = 5-10 seconds (connection overhead)
+- With pool: 100 queries = 0.5-1 seconds (10x faster!)
+```
+
+**4. Async Database Operations**
+```python
+# Problem: pyodbc is synchronous (blocks event loop)
+def sync_query():
+    conn = pyodbc.connect(connection_string)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM large_table")  # Blocks for 2 seconds!
+    # Event loop frozen - other requests wait
+
+# Solution: Run in thread pool
+async def async_query():
+    result = await asyncio.to_thread(
+        sync_query  # Runs in separate thread
+    )
+    # Event loop free - other requests processed
+
+Benefit: Maintain responsiveness while doing database I/O
+```
+
+Database Schema:
+----------------
+
+**Core Tables**:
+
+1. **users** - User accounts
+```sql
+CREATE TABLE users (
+    id UNIQUEIDENTIFIER PRIMARY KEY,
+    email NVARCHAR(255) UNIQUE,
+    name NVARCHAR(255),
+    created_at DATETIME2,
+    is_active BIT
+);
+```
+
+2. **documents** - Document metadata
+```sql
+CREATE TABLE documents (
+    id UNIQUEIDENTIFIER PRIMARY KEY,
+    user_id UNIQUEIDENTIFIER,
+    file_name NVARCHAR(255),
+    blob_url NVARCHAR(500),
+    status NVARCHAR(50),  -- uploaded, processing, completed, failed
+    created_at DATETIME2,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+3. **processing_jobs** - Job tracking
+```sql
+CREATE TABLE processing_jobs (
+    id UNIQUEIDENTIFIER PRIMARY KEY,
+    document_id UNIQUEIDENTIFIER,
+    status NVARCHAR(50),
+    created_at DATETIME2,
+    completed_at DATETIME2,
+    error_message NVARCHAR(MAX),
+    FOREIGN KEY (document_id) REFERENCES documents(id)
+);
+```
+
+4. **analytics_metrics** - Performance metrics
+```sql
+CREATE TABLE analytics_metrics (
+    id UNIQUEIDENTIFIER PRIMARY KEY,
+    metric_name NVARCHAR(100),
+    metric_value FLOAT,
+    timestamp DATETIME2,
+    INDEX idx_timestamp (timestamp),
+    INDEX idx_metric_name (metric_name)
+);
+```
+
+5. **automation_scores** - Automation tracking
+```sql
+CREATE TABLE automation_scores (
+    document_id UNIQUEIDENTIFIER PRIMARY KEY,
+    confidence_score FLOAT,
+    completeness_score FLOAT,
+    automation_score FLOAT,
+    requires_review BIT,
+    timestamp DATETIME2,
+    INDEX idx_automation_score (automation_score)
+);
+```
+
+Performance Optimization:
+-------------------------
+
+**Indexes** (for fast queries):
+```sql
+-- Created by create_tables()
+CREATE INDEX idx_documents_user_id ON documents(user_id);
+CREATE INDEX idx_documents_status ON documents(status);
+CREATE INDEX idx_documents_created_at ON documents(created_at);
+CREATE INDEX idx_metrics_timestamp ON analytics_metrics(timestamp);
+
+Impact:
+- Without index: Query scans entire table (slow for large tables)
+- With index: Query uses index (100x faster on large tables)
+
+Example:
+SELECT * FROM documents WHERE user_id = '123'
+- Without index: 5 seconds (scan 1M rows)
+- With index: 50ms (index lookup)
+```
+
+**Connection Pooling**:
+```python
+Connection Pool Size: 10-50 connections
+- Too small: Requests wait for available connection
+- Too large: Database overload, memory waste
+- Optimal: 10-20 for typical workload
+
+Configuration:
+- Min connections: 5 (always ready)
+- Max connections: 50 (prevent overload)
+- Connection timeout: 30s
+- Idle timeout: 300s (5 minutes)
+```
+
+Best Practices:
+---------------
+
+1. **Always Use Parameterized Queries**: Prevent SQL injection
+2. **Connection Pooling**: Reuse connections for performance
+3. **Transactions for Multi-Step**: Ensure atomicity
+4. **Async for I/O**: Use asyncio.to_thread for DB calls
+5. **Error Handling**: Catch and log DB errors properly
+6. **Indexing**: Create indexes on frequently queried columns
+7. **Batch Operations**: Use execute_batch() for multiple inserts
+8. **Close Connections**: Use context managers (with statements)
+9. **Monitor Query Performance**: Log slow queries (> 1s)
+10. **Regular Backups**: Automated daily backups
+
+Security:
+---------
+
+**SQL Injection Prevention**:
+```python
+# ❌ NEVER do this:
+query = f"SELECT * FROM users WHERE email = '{email}'"
+# Attacker: email = "' OR '1'='1" → Returns all users!
+
+# ✓ ALWAYS use parameterized:
+query = "SELECT * FROM users WHERE email = ?"
+params = (email,)
+# Safe: email treated as literal string, not SQL
+```
+
+**Connection String Security**:
+```python
+# ❌ Don't hardcode:
+connection_string = "Server=prod-db;Database=docdb;User=admin;Password=Pass123"
+
+# ✓ Use environment variables:
+connection_string = os.getenv("AZURE_SQL_CONNECTION_STRING")
+
+# ✓ Or Azure Key Vault:
+connection_string = key_vault.get_secret("sql-connection-string")
+```
+
+**Access Control**:
+```python
+# Principle of least privilege
+# - Application user: SELECT, INSERT, UPDATE (no DELETE on production)
+# - Admin user: Full access (only for maintenance)
+# - Read-only user: SELECT only (for reporting)
+```
+
+Error Handling:
+---------------
+
+**Common Errors**:
+
+1. **Connection Timeout**
+```python
+Error: "Login timeout expired"
+Cause: Database unreachable or overloaded
+Solution: Retry with exponential backoff
+```
+
+2. **Deadlock**
+```python
+Error: "Transaction was deadlocked"
+Cause: Two transactions waiting for each other
+Solution: Automatic retry (SQL Server retries internally)
+```
+
+3. **Constraint Violation**
+```python
+Error: "Cannot insert duplicate key"
+Cause: UNIQUE constraint violated
+Solution: Check existence before insert or use MERGE
+```
+
+4. **Connection Pool Exhausted**
+```python
+Error: "Timeout waiting for available connection"
+Cause: All connections in use
+Solution: Increase pool size or optimize queries
+```
+
+Testing:
+--------
+
+```python
+import pytest
+from unittest.mock import Mock, patch
+
+@pytest.mark.asyncio
+async def test_execute_query():
+    sql_service = SQLService("test_connection_string")
+    
+    with patch('pyodbc.connect') as mock_connect:
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.fetchall.return_value = [("doc1",), ("doc2",)]
+        mock_conn.cursor.return_value = mock_cursor
+        mock_connect.return_value = mock_conn
+        
+        result = await sql_service.execute_query(
+            "SELECT id FROM documents"
+        )
+        
+        assert len(result) == 2
+        assert result[0][0] == "doc1"
+
+@pytest.mark.asyncio
+async def test_transaction_rollback():
+    sql_service = SQLService("test_connection_string")
+    
+    # Test that errors trigger rollback
+    with pytest.raises(Exception):
+        async with sql_service.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("BEGIN TRANSACTION")
+            cursor.execute("INSERT INTO documents ...")
+            raise Exception("Simulated error")
+            # Rollback should happen automatically
+```
+
+Monitoring:
+-----------
+
+**Metrics to Track**:
+```python
+- Query execution time (P50, P95, P99)
+- Connection pool utilization (active/total)
+- Failed queries count
+- Deadlock count
+- Slow queries (> 1 second)
+- Connection errors
+
+Prometheus Metrics:
+sql_query_duration_seconds{query_type}
+sql_connection_pool_active{database}
+sql_connection_errors_total{error_type}
+sql_slow_queries_total{table}
+```
+
+**Alerting**:
+```python
+Critical Alerts:
+- Connection pool exhausted (> 90% utilization)
+- Query errors > 5% of total
+- Slow queries > 10% of total
+- Database connection failures
+
+Warning Alerts:
+- Connection pool > 70% utilization
+- Average query time > 500ms
+- Deadlocks > 10 per hour
+```
+
+References:
+-----------
+- Azure SQL Best Practices: https://docs.microsoft.com/azure/azure-sql/database/performance-guidance
+- pyodbc Documentation: https://github.com/mkleehammer/pyodbc/wiki
+- SQL Injection Prevention: https://owasp.org/www-community/attacks/SQL_Injection
+- Connection Pooling: https://docs.microsoft.com/sql/connect/python/pyodbc/step-3-proof-of-concept-connecting-to-sql-using-pyodbc
+
+Author: Document Intelligence Platform Team
+Version: 2.0.0
+Module: SQL Service - Database Abstraction Layer
+Database: Azure SQL Database
+"""
+
 import pyodbc
 import logging
 import asyncio
@@ -6,7 +463,32 @@ from contextlib import contextmanager, asynccontextmanager
 from .connection_pool import connection_pool
 
 class SQLService:
-    """Service for Azure SQL Database operations"""
+    """
+    Database Abstraction Layer for Azure SQL Database
+    
+    Provides centralized, safe database access with:
+    - Connection pooling for performance
+    - Parameterized queries for security
+    - Transaction management for consistency
+    - Async support for concurrency
+    - Error handling and logging
+    
+    Usage:
+        sql_service = SQLService(connection_string)
+        
+        # Simple query
+        results = await sql_service.execute_query(
+            "SELECT * FROM documents WHERE user_id = ?",
+            (user_id,)
+        )
+        
+        # Transaction
+        async with sql_service.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("BEGIN TRANSACTION")
+            # ... multiple operations ...
+            conn.commit()
+    """
     
     def __init__(self, connection_string: str):
         self.connection_string = connection_string
