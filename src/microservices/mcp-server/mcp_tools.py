@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Any, List, Optional, Callable
 import httpx
 from datetime import datetime
+from ...shared.http.client_pool import get_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -226,28 +227,30 @@ class MCPToolRegistry:
             # Call AI Processing Service to extract invoice data
             ai_processing_url = self.service_endpoints.get("ai-processing")
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                # First, get the document
-                doc_response = await client.get(
-                    f"{self.service_endpoints.get('document-ingestion')}/documents/{document_id}"
-                )
-                
-                if doc_response.status_code != 200:
-                    raise Exception(f"Document not found: {document_id}")
-                
-                document = doc_response.json()
-                
-                # Process the document to extract invoice data
-                process_response = await client.post(
-                    f"{ai_processing_url}/process",
-                    json={
-                        "document_id": document_id,
-                        "user_id": context.get("user_id", "system"),
-                        "processing_options": {
-                            "extract_invoice": True
-                        }
+            # Use connection pool instead of creating new client
+            client = get_http_client()
+            
+            # First, get the document
+            doc_response = await client.get(
+                f"{self.service_endpoints.get('document-ingestion')}/documents/{document_id}"
+            )
+            
+            if doc_response.status_code != 200:
+                raise Exception(f"Document not found: {document_id}")
+            
+            document = doc_response.json()
+            
+            # Process the document to extract invoice data
+            process_response = await client.post(
+                f"{ai_processing_url}/process",
+                json={
+                    "document_id": document_id,
+                    "user_id": context.get("user_id", "system"),
+                    "processing_options": {
+                        "extract_invoice": True
                     }
-                )
+                }
+            )
                 
                 if process_response.status_code == 200:
                     result = process_response.json()
@@ -283,15 +286,16 @@ class MCPToolRegistry:
             # Call Data Quality Service to validate invoice
             data_quality_url = self.service_endpoints.get("data-quality")
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{data_quality_url}/validate",
-                    json={
-                        "data": invoice_data,
-                        "validation_rules": "invoice",
-                        "user_id": context.get("user_id", "system")
-                    }
-                )
+            # Use connection pool
+            client = get_http_client()
+            response = await client.post(
+                f"{data_quality_url}/validate",
+                json={
+                    "data": invoice_data,
+                    "validation_rules": "invoice",
+                    "user_id": context.get("user_id", "system")
+                }
+            )
                 
                 if response.status_code == 200:
                     result = response.json()
