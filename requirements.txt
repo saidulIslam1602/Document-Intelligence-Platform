@@ -27,7 +27,8 @@ langchain-openai==0.0.2
 langchain-community==0.0.10
 
 # MCP (Model Context Protocol)
-mcp==0.9.0
+# Note: Using 0.9.1 as 0.9.0 is not available in PyPI
+mcp==0.9.1
 
 # Database
 pyodbc==5.0.1
