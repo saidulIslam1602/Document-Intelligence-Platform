@@ -30,6 +30,7 @@ from ...shared.storage.sql_service import SQLService
 from ...shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
 from ...shared.services.powerbi_service import powerbi_service
 from ...shared.monitoring.advanced_monitoring import monitoring_service
+from ...shared.health import get_health_service
 from .automation_scoring import AutomationScoringEngine
 
 # Initialize FastAPI app
@@ -146,14 +147,53 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": "analytics-monitoring",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0",
-        "active_connections": len(manager.active_connections)
-    }
+    """
+    Comprehensive health check endpoint
+    Checks all dependencies (Redis, SQL, etc.)
+    """
+    health_service = get_health_service()
+    health_result = await health_service.check_all()
+    
+    # Add service metadata
+    health_result["service"] = "analytics-monitoring"
+    health_result["version"] = "1.0.0"
+    health_result["active_websocket_connections"] = len(manager.active_connections)
+    
+    # Set HTTP status based on health
+    from fastapi.responses import JSONResponse
+    status_code = 200
+    if health_result["status"] == "unhealthy":
+        status_code = 503
+    elif health_result["status"] == "degraded":
+        status_code = 200  # Still accepting traffic
+    
+    return JSONResponse(content=health_result, status_code=status_code)
+
+
+@app.get("/health/live")
+async def liveness_probe():
+    """
+    Kubernetes liveness probe
+    Returns 200 if service is alive
+    """
+    health_service = get_health_service()
+    result = await health_service.check_liveness()
+    from fastapi.responses import JSONResponse
+    return JSONResponse(content=result, status_code=200)
+
+
+@app.get("/health/ready")
+async def readiness_probe():
+    """
+    Kubernetes readiness probe
+    Returns 200 if service is ready to accept traffic
+    """
+    health_service = get_health_service()
+    result = await health_service.check_readiness()
+    
+    from fastapi.responses import JSONResponse
+    status_code = 200 if result["status"] == "healthy" else 503
+    return JSONResponse(content=result, status_code=status_code)
 
 # Real-time dashboard endpoint
 @app.get("/dashboard", response_class=HTMLResponse)

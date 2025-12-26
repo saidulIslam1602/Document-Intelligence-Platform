@@ -24,6 +24,7 @@ import httpx
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ...shared.config.settings import config_manager
+from ...shared.health import get_health_service
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -295,21 +296,49 @@ app.add_middleware(AuthenticationMiddleware)
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": "api-gateway",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0",
-        "services": {
-            "document-ingestion": await check_service_health("document-ingestion"),
-            "ai-processing": await check_service_health("ai-processing"),
-            "analytics": await check_service_health("analytics"),
-            "mcp-server": await check_service_health("mcp-server"),
-            "ai-chat": await check_service_health("ai-chat"),
-            "data-quality": await check_service_health("data-quality")
-        }
-    }
+    """
+    Comprehensive health check endpoint
+    Checks all dependencies and downstream services
+    """
+    health_service = get_health_service()
+    health_result = await health_service.check_all()
+    
+    # Add service metadata
+    health_result["service"] = "api-gateway"
+    health_result["version"] = "1.0.0"
+    
+    # Set HTTP status based on health
+    status_code = 200
+    if health_result["status"] == "unhealthy":
+        status_code = 503
+    elif health_result["status"] == "degraded":
+        status_code = 200  # Still accepting traffic
+    
+    return JSONResponse(content=health_result, status_code=status_code)
+
+
+@app.get("/health/live")
+async def liveness_probe():
+    """
+    Kubernetes liveness probe
+    Returns 200 if service is alive (running)
+    """
+    health_service = get_health_service()
+    result = await health_service.check_liveness()
+    return JSONResponse(content=result, status_code=200)
+
+
+@app.get("/health/ready")
+async def readiness_probe():
+    """
+    Kubernetes readiness probe
+    Returns 200 if service is ready to accept traffic
+    """
+    health_service = get_health_service()
+    result = await health_service.check_readiness()
+    
+    status_code = 200 if result["status"] == "healthy" else 503
+    return JSONResponse(content=result, status_code=status_code)
 
 # Service routing endpoints
 @app.api_route("/documents/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
