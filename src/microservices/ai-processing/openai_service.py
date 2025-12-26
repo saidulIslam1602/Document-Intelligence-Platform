@@ -1,6 +1,494 @@
 """
-Azure OpenAI Service Integration
-Advanced AI processing using Azure OpenAI for document intelligence
+Azure OpenAI Service - GPT-4 Powered Intelligence Layer
+
+This service integrates Azure OpenAI (GPT-4, GPT-3.5, Embeddings) to provide advanced
+AI capabilities for document intelligence, including summarization, entity extraction,
+question answering, semantic search, and intelligent data validation.
+
+What is Azure OpenAI?
+----------------------
+Azure OpenAI Service provides REST API access to OpenAI's powerful language models including
+GPT-4, GPT-3.5-Turbo, and Embeddings. It's enterprise-ready with Azure security, compliance,
+and regional availability.
+
+**Key Models Available**:
+- **GPT-4**: Most capable model for complex reasoning and analysis
+- **GPT-3.5-Turbo**: Fast and cost-effective for simpler tasks
+- **text-embedding-ada-002**: Generate semantic embeddings for search
+- **DALL-E**: Image generation (not used in this platform)
+
+Why Azure OpenAI vs OpenAI API?
+--------------------------------
+
+**OpenAI API** (openai.com):
+```
+Pros:
+✓ Latest models first
+✓ Simple to get started
+
+Cons:
+❌ Data sent to OpenAI (privacy concerns)
+❌ No enterprise SLA
+❌ No regional data residency
+❌ No Azure AD integration
+❌ Limited compliance certifications
+```
+
+**Azure OpenAI** (azure.com):
+```
+Pros:
+✓ Data stays in Azure (your region)
+✓ Enterprise SLA (99.9% uptime)
+✓ Regional data residency
+✓ Azure AD authentication
+✓ Full compliance (GDPR, HIPAA, SOC 2, ISO 27001)
+✓ Azure Key Vault integration
+✓ Virtual network support
+✓ Managed identity support
+
+Cons:
+✗ Slightly delayed model releases
+✗ Requires Azure subscription
+```
+
+**Decision**: Azure OpenAI chosen for enterprise compliance and data residency.
+
+Core Capabilities:
+------------------
+
+**1. Document Summarization**
+```python
+Usage:
+summary = await openai_service.generate_summary(
+    text=document_text,
+    max_length=200
+)
+
+Input: Full document text (up to 128K tokens for GPT-4 Turbo)
+Output: Concise summary highlighting key points
+
+Use Cases:
+- Executive summaries for long contracts
+- Quick overview of invoices
+- Email digest generation
+- Report abstracts
+
+Example:
+Input: 10-page contract (5,000 words)
+Output: "This contract establishes a 3-year software license agreement
+         between Compello AS and Microsoft for Azure services at $50K/year..."
+
+Performance: 3-5 seconds
+Cost: $0.03 per 1K tokens (input) + $0.06 per 1K tokens (output)
+```
+
+**2. Entity Extraction**
+```python
+Usage:
+entities = await openai_service.extract_entities(document_text)
+
+Input: Document text
+Output: Structured entities (names, dates, amounts, locations, etc.)
+
+Extracted Entity Types:
+- PERSON: People names
+- ORGANIZATION: Company names
+- LOCATION: Addresses, cities, countries
+- DATE: Dates in various formats
+- MONEY: Currency amounts
+- PRODUCT: Product/service names
+- EMAIL: Email addresses
+- PHONE: Phone numbers
+
+Example:
+Input: "Invoice from Microsoft dated 2024-01-15 for $1,234.56"
+Output: {
+    "organizations": ["Microsoft"],
+    "dates": ["2024-01-15"],
+    "amounts": ["$1,234.56"]
+}
+```
+
+**3. Question Answering**
+```python
+Usage:
+answer = await openai_service.answer_question(
+    question="What is the total amount?",
+    context=document_text
+)
+
+Use Cases:
+- Conversational document Q&A
+- Automated form filling
+- Data extraction by natural language
+- Customer service automation
+
+Example:
+Question: "Who is the vendor?"
+Context: Invoice document text
+Answer: "Microsoft Corporation"
+Confidence: 0.95
+```
+
+**4. Semantic Search**
+```python
+Usage:
+results = await openai_service.semantic_search(
+    query="Find all Azure invoices from last month",
+    top_k=10
+)
+
+How it Works:
+1. Generate embedding for query (768-dimensional vector)
+2. Search Azure Cognitive Search for similar embeddings
+3. Rank results by cosine similarity
+4. Return top K matches with scores
+
+Benefits vs Keyword Search:
+- Understands intent: "Azure bills" matches "Microsoft invoices"
+- Handles synonyms: "find" = "search" = "locate"
+- Multi-language: Works across languages
+- Contextual: Understands "last month" in current context
+
+Performance: 200-500ms per query
+```
+
+**5. Data Validation & Enrichment**
+```python
+Usage:
+validation = await openai_service.validate_extracted_data(
+    extracted_data={"vendor": "Microsft"},  # Typo
+    context=document_text
+)
+
+Capabilities:
+- Spelling correction: "Microsft" → "Microsoft"
+- Format normalization: "Jan 15 2024" → "2024-01-15"
+- Missing data inference: Infer PO number from context
+- Data quality scoring: Confidence in extraction
+
+Example:
+Input: {"vendor": "MSFT", "amount": "1K"}
+Output: {
+    "vendor": "Microsoft Corporation",
+    "amount": 1000.00,
+    "corrections": ["Expanded abbreviation", "Converted amount"],
+    "confidence": 0.92
+}
+```
+
+Architecture:
+-------------
+
+```
+┌──────────────────── Document Processing Flow ─────────────────────┐
+│                                                                    │
+│  Document → Form Recognizer (OCR) → Extracted Text                │
+│                                         │                          │
+│                                         ↓                          │
+│                              ┌─────────────────────┐              │
+│                              │  OpenAI Service     │              │
+│                              │  (This Module)      │              │
+│                              │                     │              │
+│  ┌───────────────────────────┴─────────────────────┴───────┐     │
+│  │                                                           │     │
+│  │  GPT-4 Models:                                           │     │
+│  │  ├─ generate_summary() - Document summarization          │     │
+│  │  ├─ extract_entities() - Named entity recognition        │     │
+│  │  ├─ answer_question() - Q&A over documents               │     │
+│  │  ├─ validate_data() - Data quality & enrichment          │     │
+│  │  ├─ generate_insights() - Business intelligence          │     │
+│  │  └─ classify_intent() - Intent classification            │     │
+│  │                                                           │     │
+│  │  Embedding Models:                                        │     │
+│  │  ├─ generate_embeddings() - Semantic vectors             │     │
+│  │  ├─ semantic_search() - Vector similarity search         │     │
+│  │  └─ find_similar_documents() - Document similarity       │     │
+│  └───────────────────────────────────────────────────────────┘     │
+│                              │                                      │
+│                              ↓                                      │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │         Azure OpenAI Service (Multi-Model)                  │  │
+│  │                                                             │  │
+│  │  ┌────────────┐  ┌────────────┐  ┌─────────────────────┐  │  │
+│  │  │   GPT-4    │  │ GPT-3.5    │  │  text-embedding-    │  │  │
+│  │  │            │  │  -Turbo    │  │  ada-002            │  │  │
+│  │  │ Complex    │  │ Fast &     │  │ Semantic vectors    │  │  │
+│  │  │ reasoning  │  │ Efficient  │  │ (768 dimensions)    │  │  │
+│  │  └────────────┘  └────────────┘  └─────────────────────┘  │  │
+│  │                                                             │  │
+│  │  Endpoint: https://<region>.openai.azure.com               │  │
+│  │  Authentication: API Key (from Key Vault)                  │  │
+│  │  Region: East US (configurable)                            │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                              │                                      │
+│                              ↓                                      │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │         Azure Cognitive Search (Vector Store)               │  │
+│  │  - Stores document embeddings                               │  │
+│  │  - Enables semantic search                                  │  │
+│  │  - Hybrid search (keywords + vectors)                       │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+Token Management:
+-----------------
+
+**Understanding Tokens**:
+- Token ≈ 4 characters in English
+- 1 word ≈ 1.3 tokens
+- 1 page (double-spaced) ≈ 600 tokens
+
+**Model Context Limits**:
+```python
+GPT-4 Turbo:     128,000 tokens (100 pages)
+GPT-4:            32,000 tokens (25 pages)
+GPT-3.5-Turbo:    16,000 tokens (12 pages)
+text-embedding:    8,192 tokens (6 pages)
+```
+
+**Token Usage Calculation**:
+```python
+For Summarization:
+Input: 5,000 tokens (10-page document)
+Output: 200 tokens (summary)
+Total: 5,200 tokens
+
+Cost (GPT-4):
+Input: 5,000 × $0.03/1K = $0.15
+Output: 200 × $0.06/1K = $0.012
+Total: $0.162 per document
+```
+
+**Optimization Strategies**:
+1. **Use GPT-3.5 for simple tasks**: 10x cheaper
+2. **Chunk large documents**: Process in sections
+3. **Cache results**: Don't reprocess same content
+4. **System messages**: Reuse system context
+5. **Token counting**: Estimate before calling API
+
+Performance Characteristics:
+-----------------------------
+
+**Latency**:
+```
+GPT-3.5-Turbo:
+├─ Short prompt (< 500 tokens): 500-1000ms
+├─ Medium prompt (500-2K tokens): 1-2 seconds
+└─ Long prompt (2K-8K tokens): 2-5 seconds
+
+GPT-4:
+├─ Short prompt: 2-4 seconds
+├─ Medium prompt: 4-8 seconds
+└─ Long prompt: 8-15 seconds
+
+Embeddings:
+├─ Single document: 100-200ms
+└─ Batch (100 docs): 2-3 seconds
+```
+
+**Cost Analysis** (per 1K tokens):
+```
+Model               Input    Output   Use Case
+─────────────────────────────────────────────────
+GPT-4 Turbo        $0.01    $0.03    Complex reasoning
+GPT-4              $0.03    $0.06    High-quality analysis
+GPT-3.5-Turbo      $0.0005  $0.0015  Fast, simple tasks
+text-embedding     $0.0001  N/A      Semantic search
+
+Example Monthly Cost (100K documents):
+- Summarization (GPT-4): 100K × $0.16 = $16,000
+- Summarization (GPT-3.5): 100K × $0.008 = $800
+- Embeddings: 100K × $0.0005 = $50
+```
+
+Best Practices:
+---------------
+
+1. **Use Appropriate Model**: GPT-3.5 for speed, GPT-4 for quality
+2. **Prompt Engineering**: Clear, specific prompts get better results
+3. **Temperature Control**: 0.0 for deterministic, 0.7 for creative
+4. **System Messages**: Set context once, reuse for efficiency
+5. **Error Handling**: Retry transient errors (rate limits, timeouts)
+6. **Token Limits**: Check limits before API call
+7. **Cost Monitoring**: Track usage per use case
+8. **Response Validation**: Verify JSON format, required fields
+9. **Streaming**: Use for real-time user interfaces
+10. **Caching**: Cache identical requests (common questions)
+
+Prompt Engineering:
+-------------------
+
+**Good Prompt Structure**:
+```python
+System Message (context, role, constraints):
+"You are an expert invoice analyst. Extract key fields from invoices.
+ Return only valid JSON. Be precise with dates and amounts."
+
+User Message (specific task, examples):
+"Extract vendor name, invoice number, date, and total from this invoice:
+ [invoice text]
+ 
+ Return JSON format:
+ {
+   \"vendor\": \"...\",
+   \"invoice_number\": \"...\",
+   \"date\": \"YYYY-MM-DD\",
+   \"total\": 0.00
+ }"
+
+Benefits:
+✓ Clear role and expectations
+✓ Specific output format
+✓ Examples provided
+✓ Constraints defined
+```
+
+**Poor Prompt**:
+```python
+"Tell me about this invoice"
+
+Issues:
+❌ Vague instructions
+❌ No format specified
+❌ No constraints
+❌ Ambiguous task
+```
+
+Integration Example:
+--------------------
+
+```python
+from src.microservices.ai-processing.openai_service import OpenAIService
+
+# Initialize
+openai_service = OpenAIService(event_bus)
+
+# Summarize document
+summary = await openai_service.generate_summary(
+    text=document_text,
+    max_length=200
+)
+
+# Extract entities
+entities = await openai_service.extract_entities(document_text)
+
+# Answer questions
+answer = await openai_service.answer_question(
+    question="What is the payment due date?",
+    context=document_text
+)
+
+# Semantic search
+results = await openai_service.semantic_search(
+    query="Find all Microsoft invoices",
+    top_k=10
+)
+
+# Validate and enrich data
+validated = await openai_service.validate_extracted_data(
+    extracted_data=raw_data,
+    context=document_text
+)
+```
+
+Error Handling:
+---------------
+
+**Common Errors**:
+1. **Rate Limit** (429): Too many requests
+   - Solution: Exponential backoff, rate limiting
+2. **Timeout**: API took too long
+   - Solution: Increase timeout, chunk large documents
+3. **Invalid Request** (400): Malformed prompt
+   - Solution: Validate input, check token limits
+4. **Content Filter** (400): Harmful content detected
+   - Solution: Pre-filter content, adjust prompt
+5. **Quota Exceeded**: Monthly quota exhausted
+   - Solution: Increase quota, optimize usage
+
+Monitoring:
+-----------
+
+**Metrics to Track**:
+```python
+- Total API calls per day
+- Average response time
+- Token usage (input vs output)
+- Cost per document type
+- Error rate by type
+- Cache hit rate
+
+Alerts:
+- Daily cost exceeds budget ($100/day)
+- Error rate > 5%
+- Response time > 10s (P95)
+- Rate limit hit > 10 times/hour
+```
+
+Security:
+---------
+
+**Data Privacy**:
+- All data processed in your Azure region
+- No data used for model training
+- Data encrypted in transit (TLS 1.2+)
+- Data encrypted at rest (Azure Storage Service Encryption)
+
+**Access Control**:
+- API keys stored in Azure Key Vault
+- Managed identity for service-to-service
+- Azure AD authentication option
+- Network isolation (Private Link)
+
+Testing:
+--------
+
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_summarization():
+    service = OpenAIService()
+    
+    text = "Long document text..."
+    summary = await service.generate_summary(text, max_length=100)
+    
+    assert len(summary["summary"]) > 0
+    assert summary["summary"] != text  # Not same as input
+    assert len(summary["summary"].split()) <= 120  # Roughly 100 words
+
+@pytest.mark.asyncio
+async def test_entity_extraction():
+    service = OpenAIService()
+    
+    text = "Invoice from Microsoft dated 2024-01-15 for $1,234.56"
+    entities = await service.extract_entities(text)
+    
+    assert "Microsoft" in entities["organizations"]
+    assert "2024-01-15" in entities["dates"]
+    assert any("1234.56" in str(amt) for amt in entities["amounts"])
+```
+
+References:
+-----------
+- Azure OpenAI Docs: https://learn.microsoft.com/azure/ai-services/openai/
+- GPT-4 Guide: https://platform.openai.com/docs/guides/gpt
+- Prompt Engineering: https://platform.openai.com/docs/guides/prompt-engineering
+- Token Limits: https://platform.openai.com/docs/guides/rate-limits
+
+Comparison:
+-----------
+**Azure OpenAI vs Azure Cognitive Services**:
+- Azure OpenAI: General-purpose language understanding
+- Cognitive Services: Specialized (OCR, translation, speech)
+- Best Together: Form Recognizer for extraction + GPT-4 for intelligence
+
+Author: Document Intelligence Platform Team
+Version: 2.0.0
+Service: OpenAI Integration - GPT-4 Intelligence Layer
+Azure Service: Azure OpenAI Service
 """
 
 import asyncio
