@@ -12,6 +12,7 @@ import pandas as pd
 from ...shared.storage.sql_service import SQLService
 from ...shared.config.settings import config_manager
 from ...shared.config.enhanced_settings import get_settings
+from ...shared.cache.redis_cache import cache_service, cache_result, CacheKeys
 
 logger = logging.getLogger(__name__)
 
@@ -195,11 +196,35 @@ class AutomationScoringEngine:
             return False
         return True
     
-    def calculate_automation_metrics(
+    def _get_cache_ttl(self, time_range: str) -> int:
+        """
+        Get cache TTL based on time range
+        Shorter time ranges = shorter cache TTL (more frequent updates)
+        Longer time ranges = longer cache TTL (less frequent updates)
+        """
+        ttl_mapping = {
+            "1h": 60,      # 1 minute cache for 1-hour metrics
+            "24h": 300,    # 5 minutes cache for 24-hour metrics
+            "7d": 1800,    # 30 minutes cache for 7-day metrics
+            "30d": 3600    # 1 hour cache for 30-day metrics
+        }
+        return ttl_mapping.get(time_range, 300)  # Default 5 minutes
+    
+    async def calculate_automation_metrics(
         self,
         time_range: str = "24h"
     ) -> AutomationMetrics:
-        """Calculate overall automation metrics for a time period"""
+        """
+        Calculate overall automation metrics for a time period
+        Results are cached to reduce database load
+        """
+        # Try to get from cache first
+        cache_key = f"automation_metrics:{time_range}"
+        cached = await cache_service.get(cache_key)
+        if cached:
+            logger.info(f"Returning cached automation metrics for {time_range}")
+            return AutomationMetrics(**cached)
+        
         try:
             # Parse time range
             now = datetime.utcnow()
@@ -232,7 +257,7 @@ class AutomationScoringEngine:
             results = self.sql_service.execute_query(query, (start_time,))
             
             if not results:
-                return AutomationMetrics(
+                metrics = AutomationMetrics(
                     automation_rate=0.0,
                     total_processed=0,
                     fully_automated=0,
@@ -244,6 +269,9 @@ class AutomationScoringEngine:
                     time_range=time_range,
                     timestamp=now
                 )
+                # Cache empty result for shorter time
+                await cache_service.set(cache_key, metrics.dict(), ttl=60)
+                return metrics
             
             # Convert to DataFrame for analysis
             df = pd.DataFrame(results)
@@ -264,7 +292,7 @@ class AutomationScoringEngine:
             # Calculate automation rate
             automation_rate = (fully_automated / total_processed) * 100
             
-            return AutomationMetrics(
+            metrics = AutomationMetrics(
                 automation_rate=automation_rate,
                 total_processed=total_processed,
                 fully_automated=fully_automated,
@@ -277,12 +305,22 @@ class AutomationScoringEngine:
                 timestamp=now
             )
             
+            # Cache result with TTL based on time range
+            cache_ttl = self._get_cache_ttl(time_range)
+            await cache_service.set(cache_key, metrics.dict(), ttl=cache_ttl)
+            logger.info(f"Cached automation metrics for {time_range} (TTL: {cache_ttl}s)")
+            
+            return metrics
+            
         except Exception as e:
             logger.error(f"Error calculating automation metrics: {str(e)}")
             raise
     
-    def store_automation_score(self, score: AutomationScore):
-        """Store automation score in database"""
+    async def store_automation_score(self, score: AutomationScore):
+        """
+        Store automation score in database
+        Invalidates metric caches to ensure fresh data
+        """
         try:
             # Create table if not exists
             create_table_query = """
@@ -330,9 +368,23 @@ class AutomationScoringEngine:
             
             logger.info(f"Stored automation score for document {score.document_id}: {score.automation_score:.2f}")
             
+            # Invalidate automation metrics cache
+            await self._invalidate_metrics_cache()
+            
         except Exception as e:
             logger.error(f"Error storing automation score: {str(e)}")
             raise
+    
+    async def _invalidate_metrics_cache(self):
+        """Invalidate all automation metrics cache keys"""
+        try:
+            time_ranges = ["1h", "24h", "7d", "30d"]
+            for time_range in time_ranges:
+                cache_key = f"automation_metrics:{time_range}"
+                await cache_service.delete(cache_key)
+            logger.info("Invalidated automation metrics cache")
+        except Exception as e:
+            logger.warning(f"Error invalidating cache: {str(e)}")
     
     def check_automation_goal(self, automation_rate: float) -> Dict[str, Any]:
         """Check if automation goal is being met"""

@@ -1048,7 +1048,7 @@ async def get_automation_metrics(
 ):
     """Get invoice automation metrics to track progress toward 90%+ goal"""
     try:
-        metrics = automation_engine.calculate_automation_metrics(time_range)
+        metrics = await automation_engine.calculate_automation_metrics(time_range)
         goal_check = automation_engine.check_automation_goal(metrics.automation_rate)
         
         return {
@@ -1078,7 +1078,7 @@ async def calculate_automation_score(
     """Calculate and store automation score for an invoice"""
     try:
         score = automation_engine.calculate_invoice_score(invoice_data, validation_result)
-        automation_engine.store_automation_score(score)
+        await automation_engine.store_automation_score(score)
         
         return {
             "document_id": score.document_id,
@@ -1102,7 +1102,7 @@ async def get_automation_insights(
     """Get insights and recommendations for improving automation"""
     try:
         insights = automation_engine.get_automation_insights(time_range)
-        metrics = automation_engine.calculate_automation_metrics(time_range)
+        metrics = await automation_engine.calculate_automation_metrics(time_range)
         goal_check = automation_engine.check_automation_goal(metrics.automation_rate)
         
         return {
