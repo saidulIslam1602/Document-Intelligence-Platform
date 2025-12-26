@@ -5,6 +5,7 @@ Optimizes database and Redis connections for better performance
 
 import asyncio
 import logging
+import os
 from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
 import pyodbc
@@ -77,8 +78,20 @@ class ConnectionPoolManager:
     async def _init_redis_pool(self):
         """Initialize Redis connection pool"""
         try:
+            # Get Redis configuration from environment variables
+            redis_host = os.getenv('REDIS_HOST', 'redis')  # Default to 'redis' for Docker
+            redis_port = os.getenv('REDIS_PORT', '6379')
+            redis_password = os.getenv('REDIS_PASSWORD', None)
+            redis_db = os.getenv('REDIS_DB', '0')
+            
+            # Build Redis URL
+            if redis_password:
+                redis_url = f"redis://:{redis_password}@{redis_host}:{redis_port}/{redis_db}"
+            else:
+                redis_url = f"redis://{redis_host}:{redis_port}/{redis_db}"
+            
             self._redis_pool = redis.ConnectionPool.from_url(
-                "redis://localhost:6379",
+                redis_url,
                 max_connections=self.redis_pool_size,
                 retry_on_timeout=True
             )

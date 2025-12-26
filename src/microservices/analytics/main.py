@@ -232,7 +232,11 @@ async def get_dashboard():
             let refreshInterval = null;
             
             function connectWebSocket() {
-                ws = new WebSocket('ws://localhost:8002/ws');
+                // Generate WebSocket URL dynamically based on current location
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const host = window.location.host;
+                const wsUrl = `${protocol}//${host}/ws`;
+                ws = new WebSocket(wsUrl);
                 
                 ws.onopen = function(event) {
                     console.log('WebSocket connected');

@@ -5,6 +5,7 @@ Centralized API gateway with authentication, rate limiting, and routing
 
 import asyncio
 import logging
+import os
 import time
 import hashlib
 import jwt
@@ -53,8 +54,20 @@ security = HTTPBearer()
 config = config_manager.get_azure_config()
 logger = logging.getLogger(__name__)
 
+# Redis configuration from environment variables
+REDIS_HOST = os.getenv('REDIS_HOST', 'redis')  # Default to 'redis' for Docker, not 'localhost'
+REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
+REDIS_DB = int(os.getenv('REDIS_DB', '0'))
+
 # Redis client for rate limiting and caching
-redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+redis_client = redis.Redis(
+    host=REDIS_HOST, 
+    port=REDIS_PORT, 
+    db=REDIS_DB, 
+    decode_responses=True,
+    socket_connect_timeout=5,
+    socket_timeout=5
+)
 
 # Key Vault client for secrets
 key_vault_client = SecretClient(

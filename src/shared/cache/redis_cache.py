@@ -5,6 +5,7 @@ High-performance caching for improved API response times
 
 import json
 import logging
+import os
 from typing import Any, Optional, Dict, List
 from datetime import datetime, timedelta
 import redis.asyncio as redis
@@ -22,10 +23,17 @@ class RedisCacheService:
     async def initialize(self):
         """Initialize Redis connection"""
         try:
+            # Get Redis configuration from environment variables
+            redis_host = os.getenv('REDIS_HOST', 'redis')  # Default to 'redis' for Docker
+            redis_port = int(os.getenv('REDIS_PORT', '6379'))
+            redis_db = int(os.getenv('REDIS_DB', '0'))
+            redis_password = os.getenv('REDIS_PASSWORD', None)
+            
             self.redis_client = redis.Redis(
-                host='localhost',
-                port=6379,
-                db=0,
+                host=redis_host,
+                port=redis_port,
+                db=redis_db,
+                password=redis_password,
                 decode_responses=True,
                 socket_connect_timeout=5,
                 socket_timeout=5,
