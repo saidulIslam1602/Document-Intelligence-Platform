@@ -1,4 +1,4 @@
-# 🚀 Enterprise Document Intelligence & Analytics Platform
+# Enterprise Document Intelligence & Analytics Platform
 
 [![CI/CD Pipeline](https://github.com/saidulIslam1602/Document-Intelligence-Platform/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/saidulIslam1602/Document-Intelligence-Platform/actions)
 [![Azure](https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com/)
@@ -13,7 +13,7 @@ A comprehensive, production-ready document processing and analytics platform bui
 
 ---
 
-## 📋 Table of Contents
+##  Table of Contents
 
 - [Key Features](#-key-features)
 - [Architecture](#-architecture)
@@ -27,7 +27,7 @@ A comprehensive, production-ready document processing and analytics platform bui
 
 ---
 
-## 🌟 Key Features
+##  Key Features
 
 ### Core Capabilities
 
@@ -114,7 +114,7 @@ A comprehensive, production-ready document processing and analytics platform bui
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### System Overview
 
@@ -199,7 +199,7 @@ A comprehensive, production-ready document processing and analytics platform bui
 
 ---
 
-## 📦 Microservices Overview
+##  Microservices Overview
 
 ### Core Processing Services
 
@@ -343,7 +343,7 @@ A comprehensive, production-ready document processing and analytics platform bui
 
 ---
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 ### Core Technologies
 
@@ -427,7 +427,7 @@ A comprehensive, production-ready document processing and analytics platform bui
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 
@@ -578,7 +578,7 @@ python tests/quick_test.py
 
 ---
 
-## 📚 Documentation
+##  Documentation
 
 Comprehensive documentation is available in the `docs/` folder:
 
@@ -608,7 +608,7 @@ Comprehensive documentation is available in the `docs/` folder:
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Document-Intelligence-Platform/
@@ -666,7 +666,7 @@ Document-Intelligence-Platform/
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 We welcome contributions to improve the Document Intelligence Platform!
 
@@ -721,7 +721,7 @@ git push origin feature/your-feature-name
 
 ---
 
-## 📝 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -735,7 +735,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🌟 Key Differentiators
+##  Key Differentiators
 
 ### Production-Ready Implementation
 - Complete Azure integration with Key Vault
@@ -771,7 +771,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 💼 Use Cases
+## Use Cases
 
 ### Financial Services
 - Invoice processing automation
@@ -805,7 +805,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🎯 Roadmap
+##  Roadmap
 
 ### Completed ✅
 - [x] 14 microservices implementation
@@ -838,7 +838,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📞 Support & Contact
+##  Support & Contact
 
 ### Getting Help
 - **Documentation**: Browse the [docs/](docs/) folder
@@ -851,14 +851,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## ⭐ Star This Repository!
+##  Star This Repository!
 
 If you find this project helpful:
-- ⭐ **Star** the repository
-- 🍴 **Fork** for your own projects
-- 📢 **Share** with your network
-- 🐛 **Report** issues or bugs
-- 💡 **Suggest** new features
+-  **Star** the repository
+-  **Fork** for your own projects
+-  **Share** with your network
+-  **Report** issues or bugs
+-  **Suggest** new features
 
 ---
 
