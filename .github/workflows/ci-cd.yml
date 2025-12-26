@@ -25,7 +25,8 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest tests/ --cov=src --cov-report=xml
+        # Run only unit tests, skip integration tests that require running services
+        pytest tests/ -m "not integration" --cov=src --cov-report=xml -v
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

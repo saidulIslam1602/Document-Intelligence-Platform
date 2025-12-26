@@ -1,12 +1,17 @@
 """
 Integration Test Suite for Enhanced Document Intelligence Platform
 Tests MCP Server, LangChain, Automation Scoring, and Enhanced LLMOps
+
+NOTE: These tests require running services. Use pytest -m "not integration" to skip them in CI/CD.
 """
 
 import asyncio
 import httpx
 import pytest
 from datetime import datetime
+
+# Mark all tests in this file as integration tests
+pytestmark = pytest.mark.integration
 
 
 class TestMCPServer:
