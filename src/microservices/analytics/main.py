@@ -530,7 +530,7 @@ from src.shared.cache.redis_cache import cache_service, cache_result, cache_inva
 from src.shared.services.powerbi_service import powerbi_service
 from src.shared.monitoring.advanced_monitoring import monitoring_service
 from src.shared.health import get_health_service
-from .automation_scoring import AutomationScoringEngine
+from src.microservices.analytics.automation_scoring import AutomationScoringEngine
 
 # Initialize FastAPI app
 app = FastAPI(

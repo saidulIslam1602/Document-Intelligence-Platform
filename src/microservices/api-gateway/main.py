@@ -715,10 +715,19 @@ redis_client = redis.Redis(
 )
 
 # Key Vault client for secrets
-key_vault_client = SecretClient(
-    vault_url=config.key_vault_url,
-    credential=DefaultAzureCredential()
-)
+if config.key_vault_url and config.key_vault_url.startswith("https://"):
+    try:
+        key_vault_client = SecretClient(
+            vault_url=config.key_vault_url,
+            credential=DefaultAzureCredential()
+        )
+        logger.info("Key Vault client initialized successfully")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Key Vault client: {str(e)}")
+        key_vault_client = None
+else:
+    logger.info("Key Vault not configured - running in development mode")
+    key_vault_client = None
 
 # Service endpoints
 SERVICE_ENDPOINTS = {

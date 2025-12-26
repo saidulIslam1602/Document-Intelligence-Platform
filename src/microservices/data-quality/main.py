@@ -409,7 +409,7 @@ from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .data_validator import data_validator, ValidationRequest, QualityReportResponse, QualityLevel
+from src.microservices.data_quality.data_validator import data_validator, ValidationRequest, QualityReportResponse, QualityLevel
 from src.shared.config.settings import config_manager
 from src.shared.storage.sql_service import SQLService
 from src.shared.cache.redis_cache import cache_service, cache_result
