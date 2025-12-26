@@ -1,6 +1,404 @@
 """
-Data Quality Service
-REST API for data validation, profiling, and quality monitoring
+Data Quality Service - Automated Data Validation and Quality Monitoring
+
+This microservice ensures data integrity and quality across the Document Intelligence
+Platform by validating extracted data, profiling datasets, and monitoring quality metrics
+to maintain the 90%+ automation goal through high-quality data.
+
+Why Data Quality Matters?
+--------------------------
+
+**Poor Data Quality Impact**:
+```
+Invoice Processing WITHOUT Quality Checks:
+- Vendor: "Microsft" → Wrong (typo)
+- Amount: "1K" → Ambiguous (1000?)
+- Date: "15/03/24" → Unclear format
+- Result: Manual review required ❌
+
+Impact on Business:
+❌ Low automation rate (60-70%)
+❌ Increased processing cost
+❌ Slower processing time
+❌ Customer dissatisfaction
+❌ Compliance risks
+```
+
+**With Data Quality Service**:
+```
+Invoice Processing WITH Quality Checks:
+- Vendor: "Microsft" → Corrected to "Microsoft" ✓
+- Amount: "1K" → Normalized to 1000.00 ✓
+- Date: "15/03/24" → Standardized to "2024-03-15" ✓
+- Confidence: 0.95 (High quality) ✓
+- Result: Fully automated ✓
+
+Impact on Business:
+✓ High automation rate (90%+)
+✓ Reduced processing cost
+✓ Faster processing (no manual review)
+✓ Happy customers
+✓ Compliance ready
+```
+
+**Data Quality = Automation Success**
+
+Architecture:
+-------------
+
+```
+┌────────────── Document Processing Flow ──────────────────┐
+│                                                           │
+│  Document → OCR → Extracted Data → [QUALITY CHECK] → DB │
+│                                          ↓               │
+│                                    Data Quality          │
+│                                       Service            │
+└───────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│          Data Quality Service (Port 8006)                        │
+│                                                                  │
+│  ┌────────────── Data Validation ──────────────────┐           │
+│  │                                                  │           │
+│  │  validate_document_data():                       │           │
+│  │  - Completeness: All required fields present?   │           │
+│  │  - Format: Dates, amounts, emails valid?        │           │
+│  │  - Consistency: Cross-field validation          │           │
+│  │  - Business Rules: Domain-specific checks        │           │
+│  │  → Returns: validation_passed, errors, quality  │           │
+│  └──────────────────────────────────────────────────┘           │
+│                                                                  │
+│  ┌────────────── Data Profiling ────────────────────┐          │
+│  │                                                   │          │
+│  │  profile_dataset():                               │          │
+│  │  - Completeness: % fields populated               │          │
+│  │  - Accuracy: % fields valid                       │          │
+│  │  - Consistency: % fields consistent               │          │
+│  │  - Timeliness: Data freshness                     │          │
+│  │  → Returns: quality_score (0.0 - 1.0)            │          │
+│  └───────────────────────────────────────────────────┘          │
+│                                                                  │
+│  ┌────────────── Quality Monitoring ──────────────────┐        │
+│  │                                                     │        │
+│  │  monitor_quality_trends():                          │        │
+│  │  - Track quality over time                          │        │
+│  │  - Alert on quality degradation                     │        │
+│  │  - Generate quality reports                         │        │
+│  │  → Dashboard: Real-time quality metrics            │        │
+│  └─────────────────────────────────────────────────────┘        │
+│                                                                  │
+│  ┌────────────── Data Enrichment ───────────────────┐          │
+│  │                                                   │          │
+│  │  enrich_data():                                   │          │
+│  │  - Normalize formats (dates, amounts)            │          │
+│  │  - Correct typos (vendor names)                  │          │
+│  │  - Fill missing fields (inference)               │          │
+│  │  - Add metadata (confidence scores)              │          │
+│  │  → Returns: enriched_data with higher quality    │          │
+│  └───────────────────────────────────────────────────┘          │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+Core Capabilities:
+------------------
+
+**1. Data Validation**
+```python
+# Validate extracted invoice data
+validation_result = await data_quality.validate_document_data({
+    "vendor_name": "Microsoft",
+    "invoice_number": "INV-12345",
+    "invoice_date": "2024-01-15",
+    "total_amount": 1234.56
+})
+
+Returns:
+{
+    "validation_passed": true,
+    "quality_score": 0.95,
+    "completeness": 1.0,   # All required fields present
+    "accuracy": 0.95,      # 95% fields valid
+    "errors": [],          # No validation errors
+    "warnings": ["Vendor name not in database"],
+    "confidence": 0.95
+}
+
+Validation Rules:
+- Required fields: vendor_name, invoice_number, date, amount
+- Format validation: Dates (ISO 8601), Amounts (numeric > 0)
+- Range validation: Dates (not future), Amounts (< $1M)
+- Business rules: Invoice number unique, vendor exists
+```
+
+**2. Data Profiling**
+```python
+# Profile document dataset quality
+profile = await data_quality.profile_dataset("invoices")
+
+Returns:
+{
+    "table_name": "invoices",
+    "total_records": 10000,
+    "quality_metrics": {
+        "completeness": 0.92,      # 92% fields populated
+        "accuracy": 0.95,          # 95% fields valid
+        "consistency": 0.88,       # 88% fields consistent
+        "timeliness": 0.99,        # 99% recent data
+        "overall_quality": 0.94    # Overall score
+    },
+    "field_quality": {
+        "vendor_name": {"completeness": 1.0, "accuracy": 0.98},
+        "invoice_number": {"completeness": 1.0, "accuracy": 1.0},
+        "invoice_date": {"completeness": 0.95, "accuracy": 0.92},
+        "total_amount": {"completeness": 0.99, "accuracy": 0.96}
+    }
+}
+```
+
+**3. Quality Monitoring**
+```python
+# Monitor quality trends over time
+trends = await data_quality.get_quality_trends(days=30)
+
+Returns:
+{
+    "period": "2024-01-01 to 2024-01-30",
+    "trends": [
+        {"date": "2024-01-01", "quality_score": 0.92},
+        {"date": "2024-01-02", "quality_score": 0.93},
+        ...
+        {"date": "2024-01-30", "quality_score": 0.95}
+    ],
+    "average_quality": 0.94,
+    "quality_improvement": 0.03,  # +3% improvement
+    "alerts": [
+        {
+            "date": "2024-01-15",
+            "message": "Quality dropped below 0.90",
+            "severity": "warning"
+        }
+    ]
+}
+```
+
+**4. Data Enrichment**
+```python
+# Enrich low-quality data
+enriched = await data_quality.enrich_data({
+    "vendor_name": "Microsft",      # Typo
+    "invoice_date": "15/03/24",     # Ambiguous format
+    "total_amount": "1K"            # Non-standard format
+})
+
+Returns:
+{
+    "vendor_name": "Microsoft",         # Corrected
+    "invoice_date": "2024-03-15",       # Normalized
+    "total_amount": 1000.00,            # Standardized
+    "enrichment_log": [
+        "Corrected vendor name typo",
+        "Normalized date format to ISO 8601",
+        "Converted amount abbreviation to numeric"
+    ],
+    "confidence": 0.87
+}
+```
+
+Data Quality Dimensions:
+-------------------------
+
+**1. Completeness** (Are all required fields present?)
+```python
+Required Fields for Invoice:
+- vendor_name ✓
+- invoice_number ✓
+- invoice_date ✓
+- total_amount ✓
+
+Completeness = (Fields Present / Required Fields) × 100
+Example: 4/4 = 100% complete
+
+Impact on Automation:
+- 100% complete → Can automate
+- 75% complete → Requires enrichment
+- 50% complete → Manual review needed
+```
+
+**2. Accuracy** (Are field values valid?)
+```python
+Accuracy Checks:
+- invoice_date: Valid date format? ✓
+- total_amount: Numeric and positive? ✓
+- email: Valid email format? ✓
+- phone: Valid phone format? ✓
+
+Accuracy = (Valid Fields / Total Fields) × 100
+Example: 4/4 = 100% accurate
+
+Impact on Automation:
+- >95% accurate → Can automate
+- 85-95% accurate → Enrichment helps
+- <85% accurate → Manual review
+```
+
+**3. Consistency** (Are related fields consistent?)
+```python
+Consistency Checks:
+- Invoice date < Due date? ✓
+- Subtotal + Tax = Total? ✓
+- Line items sum = Total? ✓
+- Vendor address matches database? ✓
+
+Consistency = (Consistent Fields / Total Checks) × 100
+
+Impact on Automation:
+- High consistency → High confidence
+- Low consistency → Flags for review
+```
+
+**4. Timeliness** (Is data recent?)
+```python
+Timeliness Checks:
+- Document uploaded today? ✓
+- Not a duplicate? ✓
+- Processing within SLA? ✓
+
+Timeliness Score = f(age, SLA)
+
+Impact on Business:
+- Timely processing → Happy customers
+- Delayed processing → SLA violation
+```
+
+Validation Rules:
+-----------------
+
+**Field-Level Rules**:
+```python
+Validation Rules by Field Type:
+
+String Fields (vendor_name):
+- Not empty
+- Length 2-255 characters
+- No special characters
+- In allowed list (optional)
+
+Date Fields (invoice_date):
+- Valid date format (ISO 8601)
+- Not future date
+- Within reasonable range (last 5 years)
+
+Numeric Fields (total_amount):
+- Numeric value
+- Positive (> 0)
+- Within reasonable range (< $1M)
+
+Email Fields (contact_email):
+- Valid email format
+- Domain exists (DNS check)
+```
+
+**Business Rules**:
+```python
+Business-Specific Validation:
+
+Invoice Processing:
+1. Invoice number must be unique
+2. Vendor must exist in database
+3. Due date must be after invoice date
+4. Total must match line items sum
+5. Tax rate must match region
+
+Quality Thresholds:
+- Confidence > 0.85 → Auto-process
+- Confidence 0.70-0.85 → Enrichment
+- Confidence < 0.70 → Manual review
+```
+
+Performance Impact:
+-------------------
+
+**Quality vs Automation**:
+```
+Data Quality   Automation Rate   Processing Time
+─────────────────────────────────────────────────
+High (>0.95)   90-95%            1.2s/document
+Medium (0.85)  75-85%            2.5s/document
+Low (<0.85)    50-60%            15s/document
+
+ROI of Quality Checks:
+- Quality check time: +0.3s per document
+- Manual review saved: -13s per document
+- Net benefit: 12.7s saved (40x return)
+```
+
+Best Practices:
+---------------
+
+1. **Validate Early**: Check quality immediately after extraction
+2. **Fail Fast**: Reject obviously bad data early
+3. **Enrich When Possible**: Improve quality automatically
+4. **Track Trends**: Monitor quality over time
+5. **Alert Proactively**: Notify on quality degradation
+6. **Continuous Improvement**: Update rules based on failures
+7. **Balance Speed vs Quality**: Don't over-validate
+8. **Cache Validation Results**: Don't re-validate
+9. **Log All Decisions**: Audit trail for quality
+10. **Feedback Loop**: Learn from manual corrections
+
+Integration Example:
+--------------------
+
+```python
+from src.microservices.data-quality import data_quality_service
+
+# After OCR extraction
+extracted_data = await form_recognizer.extract_invoice(document)
+
+# Validate quality
+validation = await data_quality_service.validate_document_data(extracted_data)
+
+if validation["quality_score"] >= 0.95:
+    # High quality - auto-process
+    await process_invoice(extracted_data)
+elif validation["quality_score"] >= 0.85:
+    # Medium quality - enrich
+    enriched = await data_quality_service.enrich_data(extracted_data)
+    await process_invoice(enriched)
+else:
+    # Low quality - manual review
+    await flag_for_review(document_id, validation["errors"])
+```
+
+Monitoring:
+-----------
+
+**Metrics to Track**:
+```python
+- Average quality score per day
+- % documents passing validation
+- % documents requiring enrichment
+- % documents requiring manual review
+- Quality score by document type
+- Validation errors by field
+- Enrichment success rate
+
+Prometheus Metrics:
+quality_score_avg{document_type}
+quality_validation_passed_total{result}
+quality_enrichment_attempts_total{success}
+```
+
+References:
+-----------
+- Data Quality Dimensions: https://en.wikipedia.org/wiki/Data_quality
+- Data Validation Best Practices: https://www.dataversity.net/data-validation-best-practices/
+- Azure Data Quality: https://docs.microsoft.com/azure/purview/concept-data-quality
+
+Author: Document Intelligence Platform Team
+Version: 2.0.0
+Service: Data Quality - Validation and Monitoring
+Port: 8006
 """
 
 import asyncio
