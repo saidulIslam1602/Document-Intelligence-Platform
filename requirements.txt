@@ -72,10 +72,12 @@ pytest-cov==4.1.0
 faker==20.1.0
 
 # Documentation
-python-markdown==3.5.1
+# Note: Package is 'markdown' not 'python-markdown'
+markdown==3.5.1
 
 # Power BI
-powerbiclient==3.1.1
+# Note: Using msal for Power BI authentication instead of powerbiclient
+msal==1.24.0
 
 # Performance
 psutil==5.9.6
