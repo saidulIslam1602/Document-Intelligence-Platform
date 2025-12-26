@@ -13,8 +13,8 @@ from enum import Enum
 import pandas as pd
 import uuid
 
-from ...shared.config.settings import config_manager
-from ...shared.storage.sql_service import SQLService
+from src.shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
 
 class PoCStatus(Enum):
     DRAFT = "draft"
@@ -573,8 +573,8 @@ class PoCGenerator:
     async def _store_poc_instance(self, instance: PoCInstance):
         """Store PoC instance in database"""
         try:
-            from ...shared.storage.sql_service import SQLService
-            from ...shared.config.settings import config_manager
+            from src.shared.storage.sql_service import SQLService
+            from src.shared.config.settings import config_manager
             
             config = config_manager.get_azure_config()
             sql_service = SQLService(config.sql_connection_string)
@@ -633,8 +633,8 @@ class PoCGenerator:
     async def _get_poc_instance(self, instance_id: str) -> Optional[PoCInstance]:
         """Get PoC instance from database"""
         try:
-            from ...shared.storage.sql_service import SQLService
-            from ...shared.config.settings import config_manager
+            from src.shared.storage.sql_service import SQLService
+            from src.shared.config.settings import config_manager
             
             config = config_manager.get_azure_config()
             sql_service = SQLService(config.sql_connection_string)
@@ -667,8 +667,8 @@ class PoCGenerator:
     async def _update_poc_instance(self, instance: PoCInstance):
         """Update PoC instance in database"""
         try:
-            from ...shared.storage.sql_service import SQLService
-            from ...shared.config.settings import config_manager
+            from src.shared.storage.sql_service import SQLService
+            from src.shared.config.settings import config_manager
             
             config = config_manager.get_azure_config()
             sql_service = SQLService(config.sql_connection_string)

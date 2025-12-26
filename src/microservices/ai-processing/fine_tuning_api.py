@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field
 from enum import Enum
 
 from .fine_tuning_service import DocumentFineTuningService, FineTuningStatus, FineTuningMethod
-from ...shared.auth.auth_service import AuthService
-from ...shared.monitoring.performance_monitor import performance_monitor
+from src.shared.auth.auth_service import AuthService
+from src.shared.monitoring.performance_monitor import performance_monitor
 
 router = APIRouter(prefix="/api/v1/fine-tuning", tags=["Fine-Tuning"])
 logger = logging.getLogger(__name__)

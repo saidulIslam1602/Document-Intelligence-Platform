@@ -584,17 +584,17 @@ from src.shared.events.event_sourcing import (
     DocumentProcessingStartedEvent, DocumentProcessingCompletedEvent,
     DocumentProcessingFailedEvent, DocumentClassifiedEvent, EventBus
 )
-from src.microservices.ai_processing.openai_service import OpenAIService
-from src.microservices.ai_processing.form_recognizer_service import FormRecognizerService
-from src.microservices.ai_processing.ml_models import MLModelManager
-from src.microservices.ai_processing.fine_tuning_service import DocumentFineTuningService
-from src.microservices.ai_processing.fine_tuning_api import router as fine_tuning_router
-from src.microservices.ai_processing.fine_tuning_workflow import DocumentFineTuningWorkflow
-from src.microservices.ai_processing.fine_tuning_dashboard import FineTuningDashboard
-from src.microservices.ai_processing.fine_tuning_websocket import router as fine_tuning_ws_router
-from src.microservices.ai_processing.fine_tuning_database import initialize_fine_tuning_database
-from src.microservices.ai_processing.langchain_orchestration import LangChainOrchestrator, DocumentProcessingAgent
-from src.microservices.ai_processing.llmops_automation import LLMOpsAutomationTracker
+from openai_service import OpenAIService
+from form_recognizer_service import FormRecognizerService
+from ml_models import MLModelManager
+from fine_tuning_service import DocumentFineTuningService
+from fine_tuning_api import router as fine_tuning_router
+from fine_tuning_workflow import DocumentFineTuningWorkflow
+from fine_tuning_dashboard import FineTuningDashboard
+from fine_tuning_websocket import router as fine_tuning_ws_router
+from fine_tuning_database import initialize_fine_tuning_database
+from langchain_orchestration import LangChainOrchestrator, DocumentProcessingAgent
+from llmops_automation import LLMOpsAutomationTracker
 from src.shared.routing import get_document_router, ProcessingMode, ComplexityLevel
 
 # Initialize FastAPI app

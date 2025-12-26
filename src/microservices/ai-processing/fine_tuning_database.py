@@ -8,8 +8,8 @@ import logging
 from typing import Dict, Any, List
 from datetime import datetime
 
-from ...shared.storage.sql_service import SQLService
-from ...shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
+from src.shared.config.settings import config_manager
 
 logger = logging.getLogger(__name__)
 

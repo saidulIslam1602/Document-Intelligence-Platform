@@ -21,8 +21,8 @@ import plotly.express as px
 from azure.monitor.query import MetricsQueryClient
 from azure.identity import DefaultAzureCredential
 
-from ...shared.config.settings import config_manager
-from ...shared.events.event_sourcing import DomainEvent, EventType, EventBus
+from src.shared.config.settings import config_manager
+from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus
 
 class ExperimentStatus(Enum):
     """Experiment status enumeration"""

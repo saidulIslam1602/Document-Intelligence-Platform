@@ -15,7 +15,7 @@ from azure.storage.filedatalake import DataLakeServiceClient, FileSystemClient
 from azure.identity import DefaultAzureCredential
 from azure.core.exceptions import ResourceNotFoundError
 
-from ...shared.config.settings import config_manager
+from src.shared.config.settings import config_manager
 
 class OneLakeItemType(Enum):
     LAKEHOUSE = "lakehouse"

@@ -474,8 +474,8 @@ from src.shared.auth.auth_service import get_current_user_id, User
 from src.shared.utils.error_handler import handle_validation_error, ErrorHandler
 from src.shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
 # Import AI processing services
-from ..ai_processing.openai_service import OpenAIService
-from ..ai_processing.form_recognizer_service import FormRecognizerService
+from openai_service import OpenAIService
+from form_recognizer_service import FormRecognizerService
 
 # Initialize FastAPI app
 app = FastAPI(

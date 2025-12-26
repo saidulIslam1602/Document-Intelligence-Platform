@@ -527,7 +527,8 @@ from src.shared.events.event_sourcing import EventBus
 from src.shared.storage.data_lake_service import DataLakeService
 from src.shared.storage.sql_service import SQLService
 from src.shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
-from src.shared.services.powerbi_service import powerbi_service
+# PowerBI service not available in dev mode
+powerbi_service = None
 from src.shared.monitoring.advanced_monitoring import monitoring_service
 from src.shared.health import get_health_service
 from src.microservices.analytics.automation_scoring import AutomationScoringEngine

@@ -27,8 +27,8 @@ from transformers import AutoTokenizer, AutoModel, AutoModelForSequenceClassific
 from transformers import TrainingArguments, Trainer
 import onnxruntime as ort
 
-from ...shared.config.settings import config_manager
-from ...shared.events.event_sourcing import DomainEvent, EventType, EventBus
+from src.shared.config.settings import config_manager
+from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus
 
 class DocumentDataset(Dataset):
     """PyTorch dataset for document classification"""

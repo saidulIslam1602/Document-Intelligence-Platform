@@ -15,8 +15,8 @@ import pyodbc
 from azure.storage.blob import BlobServiceClient
 from azure.storage.file.datalake import DataLakeServiceClient
 
-from ...shared.config.settings import config_manager
-from ...shared.storage.sql_service import SQLService
+from src.shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
 
 class MigrationStatus(Enum):
     PENDING = "pending"

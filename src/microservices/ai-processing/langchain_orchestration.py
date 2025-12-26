@@ -414,7 +414,7 @@ from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import Document
 
-from ...shared.config.settings import config_manager
+from src.shared.config.settings import config_manager
 from .form_recognizer_service import FormRecognizerService
 from .openai_service import OpenAIService
 from .ml_models import MLModelManager

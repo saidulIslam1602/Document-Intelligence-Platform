@@ -15,7 +15,7 @@ from azure.identity import DefaultAzureCredential
 from azure.mgmt.sql import SqlManagementClient
 from azure.mgmt.sql.models import Database, Sku, CreateMode
 
-from ...shared.config.settings import config_manager
+from src.shared.config.settings import config_manager
 
 class WarehouseStatus(Enum):
     ONLINE = "Online"

@@ -15,10 +15,10 @@ import json
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel, Field
 
-from ...shared.config.settings import config_manager
-from ...shared.storage.sql_service import SQLService
-from ...shared.storage.data_lake_service import DataLakeService
-from ...shared.cache.redis_cache import cache_service
+from src.shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
+from src.shared.storage.data_lake_service import DataLakeService
+from src.shared.cache.redis_cache import cache_service
 
 class PipelineStatus(Enum):
     """ETL Pipeline status"""

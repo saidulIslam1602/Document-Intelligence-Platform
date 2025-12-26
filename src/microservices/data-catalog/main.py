@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from src.microservices.data_catalog.lineage_tracker import (
+from lineage_tracker import (
     lineage_tracker, AssetRegistrationRequest, LineageRelationshipRequest, 
     AssetSearchRequest, DataAssetType, LineageType
 )
@@ -84,7 +84,7 @@ async def health_check():
 async def register_asset(request: AssetRegistrationRequest):
     """Register a new data asset"""
     try:
-        from src.microservices.data_catalog.lineage_tracker import DataAsset
+        from lineage_tracker import DataAsset
         
         # Create asset object
         asset = DataAsset(
@@ -203,7 +203,7 @@ async def get_asset(asset_id: str):
 async def add_lineage_relationship(request: LineageRelationshipRequest):
     """Add a lineage relationship between assets"""
     try:
-        from src.microservices.data_catalog.lineage_tracker import LineageRelationship
+        from lineage_tracker import LineageRelationship
         
         # Create relationship object
         relationship = LineageRelationship(

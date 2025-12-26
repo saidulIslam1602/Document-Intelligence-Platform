@@ -12,8 +12,8 @@ import httpx
 
 from .fine_tuning_service import DocumentFineTuningService
 from .fine_tuning_workflow import DocumentFineTuningWorkflow
-from ...shared.config.settings import config_manager
-from ...shared.storage.sql_service import SQLService
+from src.shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
 
 logger = logging.getLogger(__name__)
 
@@ -459,7 +459,7 @@ class LLMOpsAutomationTracker:
         """
         try:
             import httpx
-            from ...shared.http import get_http_client
+            from src.shared.http import get_http_client
             
             # Get fine-tuned model deployment name
             deployment_name = await self._get_model_deployment_name(model_id)

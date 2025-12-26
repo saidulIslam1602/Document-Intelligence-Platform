@@ -21,8 +21,8 @@ import openai
 from transformers import AutoTokenizer, AutoModel
 import torch
 
-from ...shared.config.settings import config_manager
-from ...shared.events.event_sourcing import DomainEvent, EventType, EventBus
+from src.shared.config.settings import config_manager
+from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus
 
 class M365CopilotService:
     """Microsoft 365 Copilot integration service for document intelligence"""

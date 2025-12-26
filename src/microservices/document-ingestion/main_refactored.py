@@ -12,9 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # Import centralized services
-from ...shared.auth.auth_service import get_current_user_id, User
-from ...shared.utils.error_handler import handle_validation_error, ErrorHandler
-from ...shared.services.document_service import document_service, DocumentMetadata
+from src.shared.auth.auth_service import get_current_user_id, User
+from src.shared.utils.error_handler import handle_validation_error, ErrorHandler
+from src.shared.services.document_service import document_service, DocumentMetadata
 
 # Initialize FastAPI app
 app = FastAPI(

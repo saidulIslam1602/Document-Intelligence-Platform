@@ -8,7 +8,7 @@ import logging
 from typing import Dict, Any, List, Optional, Callable
 import httpx
 from datetime import datetime
-from ...shared.http.client_pool import get_http_client
+from src.shared.http.client_pool import get_http_client
 
 logger = logging.getLogger(__name__)
 

@@ -13,8 +13,8 @@ from enum import Enum
 import re
 from azure.storage.blob import BlobServiceClient
 
-from ...shared.config.settings import config_manager
-from ...shared.storage.sql_service import SQLService
+from src.shared.config.settings import config_manager
+from src.shared.storage.sql_service import SQLService
 
 class DatabaseType(Enum):
     TERADATA = "teradata"

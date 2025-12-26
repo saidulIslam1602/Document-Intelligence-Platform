@@ -541,8 +541,8 @@ from pydantic import BaseModel, Field
 import httpx
 
 from src.shared.config.settings import config_manager
-from .mcp_tools import MCPToolRegistry
-from .mcp_resources import MCPResourceManager
+from mcp_tools import MCPToolRegistry
+from mcp_resources import MCPResourceManager
 
 # Initialize FastAPI app
 app = FastAPI(

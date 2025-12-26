@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse
 
 from .fine_tuning_service import DocumentFineTuningService, FineTuningStatus
 from .fine_tuning_workflow import DocumentFineTuningWorkflow, WorkflowStatus
-from ...shared.events.event_sourcing import EventBus
+from src.shared.events.event_sourcing import EventBus
 
 class FineTuningDashboard:
     """Real-time fine-tuning dashboard"""

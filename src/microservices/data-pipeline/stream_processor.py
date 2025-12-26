@@ -19,8 +19,8 @@ from azure.mgmt.streamanalytics import StreamAnalyticsManagementClient
 from azure.mgmt.streamanalytics.models import StreamingJob, StreamingJobProperties, Sku
 from azure.identity import DefaultAzureCredential
 
-from ...shared.config.settings import config_manager
-from ...shared.events.event_sourcing import DomainEvent, EventType, EventBus
+from src.shared.config.settings import config_manager
+from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus
 
 class StreamProcessor:
     """Advanced stream processing for real-time document analytics"""
@@ -55,7 +55,7 @@ class StreamProcessor:
         )
         
         # SQL Database for storing processed data
-        from ...shared.storage.sql_service import SQLService
+        from src.shared.storage.sql_service import SQLService
         self.sql_service = SQLService(self.config.sql_connection_string)
         
         # Processing metrics

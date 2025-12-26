@@ -17,9 +17,9 @@ import numpy as np
 from azure.openai import AzureOpenAI
 from azure.core.exceptions import AzureError
 
-from ...shared.config.settings import config_manager
-from ...shared.events.event_sourcing import DomainEvent, EventType, EventBus
-from ...shared.storage.sql_service import SQLService
+from src.shared.config.settings import config_manager
+from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus
+from src.shared.storage.sql_service import SQLService
 
 class FineTuningStatus(Enum):
     """Fine-tuning job status enumeration"""
