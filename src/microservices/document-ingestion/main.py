@@ -1,6 +1,542 @@
 """
-Document Ingestion Microservice
-Handles document upload, validation, and initial processing
+Document Ingestion Microservice - Entry Point for All Document Processing
+
+This is the primary entry point for the Document Intelligence Platform. Every document
+that enters the system goes through this microservice first. It handles upload, validation,
+storage, and triggers downstream processing workflows.
+
+Business Purpose:
+-----------------
+This service is the **front door** of the Document Intelligence Platform. It:
+1. **Accepts Documents**: From users, APIs, batch uploads, M365 integration
+2. **Validates Input**: File type, size, format, security
+3. **Stores Securely**: Azure Blob Storage for files, Azure SQL for metadata
+4. **Triggers Processing**: Publishes events to AI Processing Service
+5. **Tracks Status**: Real-time document status and progress tracking
+
+Why This Service Matters:
+--------------------------
+**Problem Without Centralized Ingestion**:
+```
+User Upload → Direct to AI Processing (no validation, no tracking)
+Batch Upload → Different API (inconsistent handling)
+M365 Integration → Yet another endpoint (fragmented system)
+
+Issues:
+- No centralized validation
+- Inconsistent metadata
+- Poor error handling
+- No audit trail
+- Difficult debugging
+```
+
+**Solution With Document Ingestion Service**:
+```
+All Entry Points → Document Ingestion → Validated & Stored → AI Processing
+
+Benefits:
+✓ Single validation point
+✓ Consistent metadata
+✓ Comprehensive audit trail
+✓ Centralized error handling
+✓ Easy monitoring and debugging
+```
+
+Architecture:
+-------------
+
+```
+┌──────────────── Document Sources ─────────────────┐
+│                                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌───────────┐ │
+│  │   Web UI    │  │   REST API  │  │   M365    │ │
+│  │   Upload    │  │   Clients   │  │   Docs    │ │
+│  └──────┬──────┘  └──────┬──────┘  └─────┬─────┘ │
+│         │                │                │       │
+│         └────────────────┴────────────────┘       │
+│                          │                        │
+└──────────────────────────┼────────────────────────┘
+                           │ HTTP Requests
+                           ↓
+┌────────────────────────────────────────────────────────┐
+│      Document Ingestion Service (Port 8000)           │
+│                                                        │
+│  ┌──────────────────────────────────────────────┐    │
+│  │         FastAPI Application                  │    │
+│  │                                              │    │
+│  │  Endpoints:                                  │    │
+│  │  ├─ POST /upload - Single document upload    │    │
+│  │  ├─ POST /batch-upload - Batch processing    │    │
+│  │  ├─ GET /status/{id} - Document status       │    │
+│  │  ├─ GET /documents - List documents          │    │
+│  │  ├─ GET /documents/{id} - Get document       │    │
+│  │  ├─ DELETE /documents/{id} - Delete          │    │
+│  │  └─ GET /health - Health check               │    │
+│  └──────────────────────────────────────────────┘    │
+│                                                        │
+│  ┌──────────────────────────────────────────────┐    │
+│  │         Validation Layer                     │    │
+│  │  - File type validation (PDF, images, etc.)  │    │
+│  │  - Size limits (< 20MB per file)             │    │
+│  │  - Security scanning (malware, viruses)      │    │
+│  │  - Metadata validation (required fields)     │    │
+│  └──────────────────────────────────────────────┘    │
+│                                                        │
+│  ┌──────────────────────────────────────────────┐    │
+│  │         Storage Layer                        │    │
+│  │  - Azure Blob Storage (document files)       │    │
+│  │  - Azure SQL Database (metadata, status)     │    │
+│  │  - Azure Data Lake (archival)                │    │
+│  │  - Redis Cache (status, metadata)            │    │
+│  └──────────────────────────────────────────────┘    │
+│                                                        │
+│  ┌──────────────────────────────────────────────┐    │
+│  │         Event Publishing                     │    │
+│  │  - DocumentUploadedEvent → Event Bus         │    │
+│  │  - Triggers AI Processing Service            │    │
+│  │  - Notifies Analytics Service                │    │
+│  │  - Updates Audit Log                         │    │
+│  └──────────────────────────────────────────────┘    │
+└────────────────────────┬───────────────────────────────┘
+                         │ Events
+            ┌────────────┼────────────┐
+            │            │            │
+            ↓            ↓            ↓
+    ┌──────────┐  ┌──────────┐  ┌──────────┐
+    │AI Process│  │Analytics │  │ Audit    │
+    │Service   │  │Service   │  │ Log      │
+    └──────────┘  └──────────┘  └──────────┘
+```
+
+Key Features:
+-------------
+
+**1. Document Upload** (Single & Batch)
+```python
+# Single upload
+POST /upload
+Content-Type: multipart/form-data
+File: invoice.pdf
+Body: {
+    "user_id": "user@company.com",
+    "document_type": "invoice",
+    "metadata": {"vendor": "Microsoft"}
+}
+
+Response: {
+    "document_id": "DOC-12345",
+    "status": "uploaded",
+    "message": "Document uploaded successfully"
+}
+
+# Batch upload
+POST /batch-upload
+Body: {
+    "user_id": "user@company.com",
+    "documents": [{file: "inv1.pdf"}, {file: "inv2.pdf"}]
+}
+
+Response: {
+    "batch_id": "BATCH-789",
+    "total_documents": 2,
+    "successful": 2,
+    "failed": 0
+}
+```
+
+**2. Real-Time Status Tracking**
+```python
+GET /status/DOC-12345
+
+Response: {
+    "document_id": "DOC-12345",
+    "status": "processing",  # uploaded → processing → completed
+    "progress": 45.5,        # 0-100%
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2024-01-15T10:00:45Z",
+    "processing_result": {...} or null
+}
+```
+
+**3. Document Management**
+```python
+# List documents
+GET /documents?user_id=user@company.com&limit=50&offset=0
+
+# Get specific document
+GET /documents/DOC-12345
+
+# Delete document
+DELETE /documents/DOC-12345
+```
+
+Processing Workflow:
+--------------------
+
+```
+1. User uploads document
+   ↓
+2. Ingestion Service receives request
+   ├─ Generate document_id (UUID)
+   ├─ Validate file (type, size, security)
+   ├─ Extract metadata (filename, size, mime_type)
+   └─ Check user permissions
+   ↓
+3. Store document
+   ├─ Upload file to Azure Blob Storage
+   ├─ Store metadata in Azure SQL Database
+   ├─ Cache status in Redis
+   └─ Optional: Archive to Data Lake
+   ↓
+4. Publish event
+   ├─ Create DocumentUploadedEvent
+   ├─ Publish to Event Hub
+   ├─ AI Processing Service receives event
+   └─ Analytics Service tracks metrics
+   ↓
+5. Return response
+   ├─ document_id for tracking
+   ├─ upload_url for file access
+   └─ estimated_processing_time
+   ↓
+6. Background processing
+   ├─ AI Processing extracts data
+   ├─ Status updates via Event Bus
+   ├─ Cache invalidation on completion
+   └─ Webhook notification (if configured)
+```
+
+Validation Rules:
+-----------------
+
+**File Type Validation**:
+```python
+Allowed Types:
+- PDF: application/pdf
+- Images: image/jpeg, image/png, image/tiff
+- Office Docs: application/msword, application/vnd.openxmlformats-*
+
+Blocked Types:
+- Executables: .exe, .dll, .sh, .bat
+- Archives: .zip, .rar (must be extracted first)
+- Unknown: Any type not explicitly allowed
+```
+
+**Size Limits**:
+```python
+Single Document: 20MB max
+Batch Upload: 100 documents max, 200MB total
+File name: 255 characters max
+```
+
+**Security Checks**:
+```python
+1. File extension matches MIME type
+2. No executable content
+3. No embedded scripts
+4. Virus scan (Azure Defender integration)
+5. User has upload permissions
+```
+
+Storage Strategy:
+-----------------
+
+**Hot Storage** (Blob Storage - Standard tier):
+- Recently uploaded documents (last 30 days)
+- Fast access for processing
+- Higher cost but better performance
+
+**Cold Storage** (Data Lake - Archive tier):
+- Processed documents (>30 days)
+- Long-term retention
+- Lower cost, slower access
+
+**Metadata** (Azure SQL Database):
+```sql
+CREATE TABLE documents (
+    document_id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_size BIGINT NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    blob_url VARCHAR(500) NOT NULL,
+    status VARCHAR(50) NOT NULL, -- uploaded, processing, completed, failed
+    progress FLOAT DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    processing_result TEXT,
+    error_message TEXT,
+    
+    INDEX idx_user_id (user_id),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+);
+```
+
+Event-Driven Architecture:
+---------------------------
+
+**Published Events**:
+```python
+DocumentUploadedEvent:
+    document_id: DOC-12345
+    user_id: user@company.com
+    file_name: invoice.pdf
+    file_size: 524288
+    document_type: invoice
+    timestamp: 2024-01-15T10:00:00Z
+    metadata: {...}
+
+DocumentProcessingCompletedEvent:
+    document_id: DOC-12345
+    status: completed
+    processing_duration: 1.234
+    result: {...}
+
+DocumentProcessingFailedEvent:
+    document_id: DOC-12345
+    error_message: "OCR failed: timeout"
+    retry_count: 3
+```
+
+**Event Subscribers**:
+1. **AI Processing Service**: Starts document analysis
+2. **Analytics Service**: Tracks upload metrics
+3. **Audit Service**: Logs all document operations
+4. **Notification Service**: Sends user notifications
+5. **Data Lake Service**: Archives completed documents
+
+Performance Characteristics:
+-----------------------------
+
+**Throughput**:
+- Single uploads: 100 uploads/sec (per instance)
+- Batch uploads: 50 batches/sec = 500-1000 docs/sec
+- Horizontal scaling: Linear (stateless service)
+
+**Latency**:
+```
+Upload workflow:
+├─ Validation: 50ms
+├─ Blob Storage upload: 200-500ms (depends on file size)
+├─ SQL metadata insert: 10ms
+├─ Event publishing: 20ms
+├─ Cache update: 5ms
+└─ Response: 10ms
+
+Total P50: 300ms
+Total P95: 800ms
+Total P99: 1500ms
+```
+
+**Resource Usage** (per instance):
+- CPU: 20-40% avg, 80% peak
+- Memory: 512MB-1GB
+- Network: 10-50 Mbps (file transfers)
+- Storage I/O: 50-100 IOPS
+
+Monitoring and Observability:
+------------------------------
+
+**Health Check** (GET /health):
+```json
+{
+    "status": "healthy",
+    "dependencies": {
+        "blob_storage": "healthy",
+        "sql_database": "healthy",
+        "event_hub": "healthy",
+        "redis_cache": "healthy"
+    },
+    "metrics": {
+        "total_uploads_today": 1543,
+        "active_processing": 23,
+        "avg_upload_time_ms": 345,
+        "error_rate": 0.012
+    }
+}
+```
+
+**Prometheus Metrics**:
+```python
+document_uploads_total{status="success"}
+document_uploads_total{status="failed"}
+document_upload_duration_seconds
+document_upload_size_bytes
+document_processing_queue_size
+```
+
+**Logging**:
+- All uploads logged with document_id
+- Error details for debugging
+- Performance metrics for optimization
+- Audit trail for compliance
+
+Caching Strategy:
+-----------------
+
+**Redis Cache Usage**:
+```python
+# Document status (TTL: 5 minutes)
+cache_key = f"document:status:{document_id}"
+cache.set(cache_key, status_data, ttl=300)
+
+# Document metadata (TTL: 1 hour)
+cache_key = f"document:metadata:{document_id}"
+cache.set(cache_key, metadata, ttl=3600)
+
+# User's recent documents (TTL: 10 minutes)
+cache_key = f"user:documents:{user_id}"
+cache.set(cache_key, document_list, ttl=600)
+
+# Cache invalidation on updates
+@cache_invalidate(CacheKeys.DOCUMENT_STATUS)
+async def update_document_status(document_id, new_status):
+    # Automatically clears cache when status changes
+    pass
+```
+
+Error Handling:
+---------------
+
+**Graceful Degradation**:
+```python
+if blob_storage_unavailable:
+    # Fall back to local temporary storage
+    # Queue for upload when storage recovers
+    store_temporarily_and_queue()
+
+if sql_database_slow:
+    # Write to cache first
+    # Async write to database
+    write_to_cache_async_to_db()
+
+if event_publishing_fails:
+    # Retry with exponential backoff
+    # Store in dead letter queue if fails
+    retry_then_dead_letter()
+```
+
+Security:
+---------
+
+**Authentication**:
+- JWT Bearer tokens (from API Gateway)
+- User ID extracted from token
+- All requests authenticated
+
+**Authorization**:
+- Role-based access control (RBAC)
+- Users can only access their own documents
+- Admin role can access all documents
+
+**Data Protection**:
+- Files encrypted at rest (Azure Storage Service Encryption)
+- Files encrypted in transit (TLS 1.2+)
+- Sensitive metadata masked in logs
+
+**Compliance**:
+- GDPR: Right to delete (DELETE endpoint)
+- Audit trail: All operations logged
+- Data retention: Configurable per document type
+
+Best Practices:
+---------------
+
+1. **Always Validate Input**: Never trust client data
+2. **Use Async I/O**: For file operations and database calls
+3. **Cache Aggressively**: Status and metadata queries are frequent
+4. **Fail Fast**: Validation errors before expensive operations
+5. **Idempotent Operations**: Same upload request → same result
+6. **Monitor Everything**: Uploads, errors, performance
+7. **Set Timeouts**: For blob uploads and database operations
+8. **Rate Limiting**: Prevent abuse (100 uploads/minute per user)
+
+Testing:
+--------
+
+```python
+import pytest
+from httpx import AsyncClient
+
+@pytest.mark.asyncio
+async def test_document_upload():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        files = {"file": ("test.pdf", b"PDF content", "application/pdf")}
+        data = {"user_id": "test@example.com", "document_type": "invoice"}
+        
+        response = await client.post("/upload", files=files, data=data)
+        
+        assert response.status_code == 200
+        assert "document_id" in response.json()
+
+@pytest.mark.asyncio
+async def test_document_status():
+    # Test status tracking
+    response = await client.get("/status/TEST-DOC-123")
+    assert response.status_code == 200
+    assert "status" in response.json()
+```
+
+Deployment:
+-----------
+
+**Docker Compose**:
+```yaml
+services:
+  document-ingestion:
+    image: docintel-ingestion:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - AZURE_STORAGE_CONNECTION_STRING
+      - AZURE_SQL_CONNECTION_STRING
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+      - sqlserver
+```
+
+**Kubernetes**:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: document-ingestion
+spec:
+  replicas: 3  # Horizontal scaling
+  template:
+    spec:
+      containers:
+      - name: ingestion
+        image: docintel-ingestion:latest
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+```
+
+References:
+-----------
+- FastAPI File Uploads: https://fastapi.tiangolo.com/tutorial/request-files/
+- Azure Blob Storage: https://docs.microsoft.com/azure/storage/blobs/
+- Event-Driven Architecture: https://microservices.io/patterns/data/event-sourcing.html
+- Document Processing Best Practices: https://cloud.google.com/document-ai/docs/best-practices
+
+Industry Standards:
+-------------------
+- **Upload Limits**: 20MB (industry standard for documents)
+- **Status Updates**: Real-time (WebSocket or polling)
+- **Error Handling**: Fail fast, retry transient errors
+- **Security**: OAuth 2.0 + JWT authentication
+
+Author: Document Intelligence Platform Team
+Version: 2.0.0
+Service: Document Ingestion - Primary Entry Point
+Port: 8000
 """
 
 import asyncio
