@@ -99,8 +99,8 @@ class DocumentService:
                 updated_at=now
             )
             
-        # Store metadata in Azure SQL Database
-        await self._store_sql_metadata(document_metadata)
+            # Store metadata in Azure SQL Database
+            await self._store_sql_metadata(document_metadata)
             
             # Store processing job in SQL Database
             await self._store_sql_job(document_metadata)
@@ -205,9 +205,6 @@ class DocumentService:
     ):
         """Update document status across all systems"""
         try:
-        # Update SQL Database
-        await self._update_sql_status(document_id, status, error_message, processing_metadata)
-            
             # Update SQL Database
             await self._update_sql_status(document_id, status, error_message, processing_metadata)
             

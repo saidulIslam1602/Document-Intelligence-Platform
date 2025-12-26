@@ -1,6 +1,5 @@
 """
 Advanced A/B Testing Framework for Document Intelligence Platform
-"""
 Enterprise-level experimentation capabilities for M365 Copilot features
 """
 

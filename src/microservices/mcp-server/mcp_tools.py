@@ -251,18 +251,18 @@ class MCPToolRegistry:
                     }
                 }
             )
-                
-                if process_response.status_code == 200:
-                    result = process_response.json()
-                    return {
-                        "success": True,
-                        "document_id": document_id,
-                        "invoice_data": result.get("processing_result", {}),
-                        "confidence": result.get("processing_result", {}).get("confidence", 0.0),
-                        "timestamp": datetime.utcnow().isoformat()
-                    }
-                else:
-                    raise Exception(f"Failed to extract invoice data: {process_response.text}")
+            
+            if process_response.status_code == 200:
+                result = process_response.json()
+                return {
+                    "success": True,
+                    "document_id": document_id,
+                    "invoice_data": result.get("processing_result", {}),
+                    "confidence": result.get("processing_result", {}).get("confidence", 0.0),
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            else:
+                raise Exception(f"Failed to extract invoice data: {process_response.text}")
         
         except Exception as e:
             logger.error(f"Error in extract_invoice_data: {str(e)}")
@@ -296,19 +296,19 @@ class MCPToolRegistry:
                     "user_id": context.get("user_id", "system")
                 }
             )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    return {
-                        "success": True,
-                        "validation_result": result,
-                        "is_valid": result.get("is_valid", False),
-                        "validation_score": result.get("quality_score", 0.0),
-                        "issues": result.get("issues", []),
-                        "timestamp": datetime.utcnow().isoformat()
-                    }
-                else:
-                    raise Exception(f"Failed to validate invoice: {response.text}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                return {
+                    "success": True,
+                    "validation_result": result,
+                    "is_valid": result.get("is_valid", False),
+                    "validation_score": result.get("quality_score", 0.0),
+                    "issues": result.get("issues", []),
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            else:
+                raise Exception(f"Failed to validate invoice: {response.text}")
         
         except Exception as e:
             logger.error(f"Error in validate_invoice: {str(e)}")

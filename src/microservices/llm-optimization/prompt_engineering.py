@@ -1,6 +1,5 @@
 """
 Advanced Prompt Engineering for Large Language Models
-"""
 Enterprise-level prompt optimization for M365 Copilot features
 """
 
