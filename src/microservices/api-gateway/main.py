@@ -1159,6 +1159,94 @@ async def get_documents(limit: int = 10, offset: int = 0):
         "offset": offset
     }
 
+@app.get("/documents/{document_id}")
+async def get_document_details(document_id: str):
+    """Get details for a specific document (mock endpoint for local dev)"""
+    logger.info(f"Fetching document details for {document_id}")
+    
+    # Mock document details based on document_id
+    mock_documents = {
+        "doc1": {
+            "id": "doc1",
+            "filename": "Sample Invoice.pdf",
+            "type": "invoice",
+            "status": "processed",
+            "uploaded_at": "2025-12-27T10:00:00Z",
+            "size": 45678,
+            "confidence": 0.95,
+            "extracted_data": {
+                "invoice_number": "INV-2025-001",
+                "date": "2025-12-27",
+                "total_amount": 1250.00,
+                "currency": "USD",
+                "vendor": "Acme Corporation",
+                "items": [
+                    {"description": "Product A", "quantity": 2, "unit_price": 500.00, "total": 1000.00},
+                    {"description": "Product B", "quantity": 1, "unit_price": 250.00, "total": 250.00}
+                ]
+            },
+            "entities": [
+                {"type": "organization", "value": "Acme Corporation", "confidence": 0.98},
+                {"type": "date", "value": "2025-12-27", "confidence": 0.96},
+                {"type": "money", "value": "$1,250.00", "confidence": 0.97}
+            ]
+        },
+        "doc2": {
+            "id": "doc2",
+            "filename": "Receipt.jpg",
+            "type": "receipt",
+            "status": "processed",
+            "uploaded_at": "2025-12-27T09:30:00Z",
+            "size": 12345,
+            "confidence": 0.92,
+            "extracted_data": {
+                "receipt_number": "RCP-789",
+                "date": "2025-12-26",
+                "total_amount": 45.99,
+                "currency": "USD",
+                "merchant": "Coffee Shop",
+                "items": [
+                    {"description": "Latte", "quantity": 2, "unit_price": 5.50, "total": 11.00},
+                    {"description": "Sandwich", "quantity": 1, "unit_price": 8.99, "total": 8.99}
+                ]
+            },
+            "entities": [
+                {"type": "organization", "value": "Coffee Shop", "confidence": 0.94},
+                {"type": "date", "value": "2025-12-26", "confidence": 0.93},
+                {"type": "money", "value": "$45.99", "confidence": 0.95}
+            ]
+        },
+        "doc3": {
+            "id": "doc3",
+            "filename": "Contract Agreement.pdf",
+            "type": "contract",
+            "status": "processing",
+            "uploaded_at": "2025-12-27T11:15:00Z",
+            "size": 98765,
+            "confidence": 0.88,
+            "extracted_data": {
+                "contract_number": "CTR-2025-042",
+                "effective_date": "2026-01-01",
+                "expiration_date": "2026-12-31",
+                "parties": ["Company A", "Company B"],
+                "contract_value": 50000.00,
+                "currency": "USD"
+            },
+            "entities": [
+                {"type": "organization", "value": "Company A", "confidence": 0.91},
+                {"type": "organization", "value": "Company B", "confidence": 0.90},
+                {"type": "date", "value": "2026-01-01", "confidence": 0.89},
+                {"type": "money", "value": "$50,000.00", "confidence": 0.92}
+            ]
+        }
+    }
+    
+    # Return mock document or 404
+    if document_id in mock_documents:
+        return mock_documents[document_id]
+    else:
+        raise HTTPException(status_code=404, detail="Document not found")
+
 @app.post("/documents/upload")
 async def upload_document(request: Request):
     """Upload a document (mock endpoint for local dev)"""
