@@ -146,7 +146,10 @@ export default function Documents() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Documents</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Documents</h1>
+          <p className="text-sm text-gray-500 mt-1">Upload and manage your documents</p>
+        </div>
         <div className="flex gap-2">
           <Button 
             onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
@@ -155,7 +158,7 @@ export default function Documents() {
             {viewMode === 'grid' ? '☰ List' : '⊞ Grid'}
           </Button>
           <Button onClick={() => setShowUpload(true)}>
-            Upload Documents
+            📤 Upload
           </Button>
         </div>
       </div>
@@ -218,54 +221,63 @@ export default function Documents() {
             </div>
           )}
 
-          {filteredDocs.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              <p>No documents found</p>
-              <Button onClick={() => setShowUpload(true)} variant="primary" className="mt-4">
-                Upload Your First Document
+          {filteredDocs.length === 0 && !loading && (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">📄</div>
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">No documents yet</h3>
+              <p className="text-gray-500 mb-6">Get started by uploading your first document</p>
+              <Button onClick={() => setShowUpload(true)} variant="primary">
+                📤 Upload Document
               </Button>
             </div>
           )}
         </>
       )}
 
-      <Modal isOpen={showUpload} onClose={cancelUpload} title="Upload Documents">
+      <Modal isOpen={showUpload} onClose={cancelUpload} title={selectedFiles.length > 0 ? `Uploading ${selectedFiles.length} file(s)` : 'Upload Documents'}>
         {selectedFiles.length === 0 ? (
-          <DocumentUpload onUpload={handleFilesSelected} />
-        ) : (
-          <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm font-medium text-blue-900">
-                {selectedFiles.length} file(s) selected
+          <div>
+            <DocumentUpload onUpload={handleFilesSelected} />
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-600">
+                💡 <strong>Tip:</strong> You can select multiple files at once for batch upload (up to 100 files)
               </p>
             </div>
-            
+          </div>
+        ) : (
+          <div className="space-y-4">
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {uploadProgress.map((progress, idx) => (
-                <div key={idx} className="border rounded-lg p-4">
+                <div key={idx} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium truncate flex-1 mr-4">
-                      {progress.file}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-lg">
+                        {progress.status === 'success' && '✅'}
+                        {progress.status === 'error' && '❌'}
+                        {progress.status === 'uploading' && '⏳'}
+                        {progress.status === 'pending' && '📄'}
+                      </span>
+                      <span className="text-sm font-medium truncate">
+                        {progress.file}
+                      </span>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-1 rounded ${
+                      progress.status === 'success' ? 'bg-green-100 text-green-700' :
+                      progress.status === 'error' ? 'bg-red-100 text-red-700' :
+                      progress.status === 'uploading' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {progress.status === 'success' && 'Done'}
+                      {progress.status === 'error' && 'Failed'}
+                      {progress.status === 'uploading' && `${progress.progress}%`}
+                      {progress.status === 'pending' && 'Waiting'}
                     </span>
-                    {progress.status === 'success' && (
-                      <span className="text-green-600 font-medium">✓ Done</span>
-                    )}
-                    {progress.status === 'error' && (
-                      <span className="text-red-600 font-medium">✗ Failed</span>
-                    )}
-                    {progress.status === 'uploading' && (
-                      <span className="text-blue-600 font-medium">Uploading...</span>
-                    )}
-                    {progress.status === 'pending' && (
-                      <span className="text-gray-500 font-medium">Pending</span>
-                    )}
                   </div>
                   
-                  {/* Progress bar */}
                   {(progress.status === 'uploading' || progress.status === 'success') && (
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
                       <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
                           progress.status === 'success' ? 'bg-green-600' : 'bg-blue-600'
                         }`}
                         style={{ width: `${progress.progress}%` }}
@@ -273,39 +285,40 @@ export default function Documents() {
                     </div>
                   )}
                   
-                  {/* Error message */}
                   {progress.status === 'error' && progress.error && (
-                    <p className="text-xs text-red-600 mt-1">{progress.error}</p>
+                    <p className="text-xs text-red-600 mt-1 ml-7">{progress.error}</p>
                   )}
                 </div>
               ))}
             </div>
             
-            <div className="flex gap-3 pt-4 border-t">
+            <div className="flex gap-2 pt-3 border-t">
               <Button
                 onClick={startUpload}
                 disabled={uploading}
                 className="flex-1"
               >
-                {uploading ? 'Uploading...' : 'Start Upload'}
+                {uploading ? '⏳ Uploading...' : '📤 Upload All'}
               </Button>
-              <Button
-                onClick={() => {
-                  setSelectedFiles([]);
-                  setUploadProgress([]);
-                }}
-                variant="secondary"
-                disabled={uploading}
-              >
-                Clear
-              </Button>
-              <Button
-                onClick={cancelUpload}
-                variant="secondary"
-                disabled={uploading}
-              >
-                Cancel
-              </Button>
+              {!uploading && (
+                <>
+                  <Button
+                    onClick={() => {
+                      setSelectedFiles([]);
+                      setUploadProgress([]);
+                    }}
+                    variant="secondary"
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    onClick={cancelUpload}
+                    variant="secondary"
+                  >
+                    Cancel
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}

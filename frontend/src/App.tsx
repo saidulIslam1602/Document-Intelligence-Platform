@@ -10,7 +10,6 @@ const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Documents = lazy(() => import('./pages/Documents'));
-const BatchUpload = lazy(() => import('./pages/BatchUpload'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Chat = lazy(() => import('./pages/Chat'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -39,7 +38,6 @@ function App() {
               <Route index element={<Navigate to="/dashboard" />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="documents" element={<Documents />} />
-              <Route path="batch-upload" element={<BatchUpload />} />
               <Route path="entities" element={<Entities />} />
               <Route path="chat" element={<Chat />} />
               <Route path="search" element={<Search />} />

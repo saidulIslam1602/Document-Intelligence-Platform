@@ -13,7 +13,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
   { path: '/documents', label: 'Documents', icon: '📄' },
-  { path: '/batch-upload', label: 'Batch Upload', icon: '📦' },
   { path: '/entities', label: 'Entities', icon: '🏷️' },
   { path: '/chat', label: 'AI Chat', icon: '💬' },
   { path: '/search', label: 'Search', icon: '🔍' },
