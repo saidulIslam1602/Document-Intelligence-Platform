@@ -1335,12 +1335,99 @@ async def upload_document(
             logger.info(f"Document {result.get('document_id')} uploaded and queued for AI processing")
             return result
             
-            # Generate industry-standard invoice extraction
-            invoice_hash = hash(filename)
-            invoice_num = abs(invoice_hash) % 100000
-            vendor_id = abs(invoice_hash) % 20
+    except Exception as e:
+        logger.error(f"Error uploading document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Upload failed")
+
+@app.delete("/documents/{document_id}")
+async def delete_document(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Delete a document"""
+    try:
+        # Delete from document-ingestion service
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(
+                f"http://{DOCUMENT_INGESTION_SERVICE}/documents/{document_id}",
+                headers={"X-User-ID": user_id},
+                timeout=30.0
+            )
             
-            vendors = [
+            if response.status_code == 404:
+                raise HTTPException(status_code=404, detail="Document not found")
+            
+            response.raise_for_status()
+            
+            logger.info(f"Document {document_id} deleted by user {user_id}")
+            return {"message": "Document deleted successfully", "document_id": document_id}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Delete failed")
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    health_service = get_health_service()
+    health_status = await health_service.check_health()
+    
+    return health_status
+
+@app.api_route("/documents/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def route_document_requests(request: Request, path: str):
+    """Route requests to document ingestion service"""
+    try:
+        # Forward to document-ingestion service
+        async with httpx.AsyncClient() as client:
+            response = await client.request(
+                method=request.method,
+                url=f"http://{DOCUMENT_INGESTION_SERVICE}/documents/{path}",
+                headers=dict(request.headers),
+                content=await request.body(),
+                timeout=60.0
+            )
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+    except Exception as e:
+        logger.error(f"Error routing request: {str(e)}")
+        raise HTTPException(status_code=500, detail="Request routing failed")
+
+# Old mock code removed - using real AI processing above
+
+@app.get("/api-keys")
+async def get_api_keys():
+    """Get list of API keys"""
+    if DATABASE_AVAILABLE:
+        keys = db.get_api_keys()
+        return {"api_keys": keys}
+    else:
+        return {"api_keys": []}
+
+@app.post("/api-keys")
+async def create_api_key(request: Request):
+    """Create a new API key"""
+    try:
+        data = await request.json()
+        key_name = data.get("name", "Default Key")
+        
+        if DATABASE_AVAILABLE:
+            api_key = db.create_api_key(key_name)
+            return {"api_key": api_key}
+        else:
+            return {"api_key": {"id": "key_demo", "name": key_name, "key": "demo-key-123"}}
+    except Exception as e:
+        logger.error(f"Error creating API key: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create API key")
+
+# Remove old mock vendor code below
+'''
+Old mock code for vendors = [
                 {"name": "Acme Corporation", "address": "123 Business St, New York, NY 10001", "tax_id": "12-3456789", "email": "billing@acme.com", "phone": "+1-555-0100"},
                 {"name": "Global Supplies Inc", "address": "456 Commerce Ave, Chicago, IL 60601", "tax_id": "98-7654321", "email": "ap@globalsupplies.com", "phone": "+1-555-0200"},
                 {"name": "Tech Solutions LLC", "address": "789 Innovation Dr, San Francisco, CA 94102", "tax_id": "45-6789012", "email": "invoices@techsolutions.com", "phone": "+1-555-0300"},
