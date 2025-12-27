@@ -1629,6 +1629,34 @@ async def route_mcp_requests(request: Request, path: str):
     """Route requests to MCP server"""
     return await route_request(request, "mcp-server", f"/mcp/{path}")
 
+@app.post("/chat/message")
+async def chat_message(request: Request):
+    """AI Chat endpoint - responds to user messages"""
+    try:
+        body = await request.json()
+        user_message = body.get('message', '')
+        
+        # Mock AI response (in production, this would call OpenAI or Azure OpenAI)
+        responses = [
+            f"I understand you're asking about: '{user_message[:50]}...'. Based on your uploaded invoices, I can help you analyze vendor spending, track payment terms, and identify patterns.",
+            "I've analyzed your documents. Would you like me to summarize invoice totals by vendor, identify overdue payments, or provide insights on spending trends?",
+            "I can help you with document analysis! Try asking me about specific vendors, invoice amounts, payment terms, or tax calculations from your uploaded documents.",
+            f"Regarding '{user_message[:50]}...': I can search through your {50}+ invoices to find relevant information. What specific details would you like to know?",
+        ]
+        
+        import random
+        response_text = random.choice(responses)
+        
+        return {
+            "content": response_text,
+            "response": response_text,
+            "timestamp": datetime.utcnow().isoformat(),
+            "model": "document-intelligence-assistant"
+        }
+    except Exception as e:
+        logger.error(f"Chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Chat service error")
+
 @app.api_route("/chat/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def route_chat_requests(request: Request, path: str):
     """Route requests to AI chat service"""

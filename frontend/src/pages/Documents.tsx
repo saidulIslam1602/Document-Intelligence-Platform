@@ -42,7 +42,14 @@ export default function Documents() {
   const loadDocuments = async () => {
     try {
       const res = await api.get('/documents');
-      setDocuments(res.data.documents || []);
+      // Transform snake_case to camelCase for frontend components
+      const transformedDocs = (res.data.documents || []).map((doc: any) => ({
+        ...doc,
+        uploadedAt: doc.uploaded_at,
+        fileSize: doc.file_size,
+        extractedEntities: 0 // Can be updated later if we add entity count to API
+      }));
+      setDocuments(transformedDocs);
     } catch (error) {
       console.error('Failed to load documents');
     } finally {
@@ -142,7 +149,89 @@ export default function Documents() {
   const viewDocument = async (docId: string) => {
     try {
       const res = await api.get(`/documents/${docId}`);
-      setSelectedDoc(res.data);
+      const docData = res.data;
+      
+      // Transform invoice extraction data for display
+      let content = '';
+      if (docData.invoice_number) {
+        content = `INVOICE EXTRACTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📄 Invoice Details:
+   Invoice Number:    ${docData.invoice_number || 'N/A'}
+   Invoice Date:      ${docData.invoice_date || 'N/A'}
+   Due Date:          ${docData.due_date || 'N/A'}
+   PO Number:         ${docData.purchase_order_number || 'N/A'}
+
+👤 Vendor Information:
+   Name:              ${docData.vendor_name || 'N/A'}
+   Address:           ${docData.vendor_address || 'N/A'}
+   Tax ID:            ${docData.vendor_tax_id || 'N/A'}
+   Email:             ${docData.vendor_email || 'N/A'}
+   Phone:             ${docData.vendor_phone || 'N/A'}
+
+🏢 Customer Information:
+   Name:              ${docData.customer_name || 'N/A'}
+   Address:           ${docData.customer_address || 'N/A'}
+   Tax ID:            ${docData.customer_tax_id || 'N/A'}
+
+💰 Financial Summary:
+   Subtotal:          ${docData.currency_code || 'USD'} ${docData.subtotal || '0.00'}
+   Tax (${docData.tax_rate || '0'}%):         ${docData.currency_code || 'USD'} ${docData.tax_amount || '0.00'}
+   Discount:          ${docData.currency_code || 'USD'} ${docData.discount_amount || '0.00'}
+   Shipping:          ${docData.currency_code || 'USD'} ${docData.shipping_amount || '0.00'}
+   ═══════════════════════════════════════════════
+   TOTAL:             ${docData.currency_code || 'USD'} ${docData.total_amount || '0.00'}
+   Amount Paid:       ${docData.currency_code || 'USD'} ${docData.amount_paid || '0.00'}
+   Balance Due:       ${docData.currency_code || 'USD'} ${docData.balance_due || '0.00'}
+
+📋 Line Items:`;
+        
+        if (docData.line_items && Array.isArray(docData.line_items)) {
+          docData.line_items.forEach((item: any, idx: number) => {
+            content += `
+   ${idx + 1}. ${item.description || 'N/A'}
+      Quantity: ${item.quantity || 0} × ${docData.currency_code || 'USD'} ${item.unit_price || '0.00'} = ${docData.currency_code || 'USD'} ${item.amount || '0.00'}`;
+          });
+        }
+        
+        content += `
+
+💳 Payment Terms:
+   Payment Terms:     ${docData.payment_terms || 'N/A'}
+   Payment Method:    ${docData.payment_method || 'N/A'}
+
+🏦 Banking Details:
+   Bank Name:         ${docData.bank_name || 'N/A'}
+   Account Number:    ${docData.bank_account_number || 'N/A'}
+   Routing Number:    ${docData.bank_routing_number || 'N/A'}
+
+📝 Notes:
+   ${docData.notes || 'N/A'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Extraction Confidence: ${((docData.confidence_score || 0) * 100).toFixed(1)}%`;
+      }
+      
+      // Transform to DocumentViewer format
+      const transformedDoc = {
+        id: docData.id,
+        filename: docData.filename,
+        content: content || 'No extraction data available',
+        entities: docData.entities || [],
+        metadata: {
+          file_type: docData.file_type,
+          document_type: docData.document_type,
+          status: docData.status,
+          file_size: docData.file_size,
+          uploaded_at: docData.uploaded_at,
+          confidence_score: docData.confidence_score,
+          // Include all invoice fields for metadata view
+          ...docData
+        }
+      };
+      
+      setSelectedDoc(transformedDoc);
     } catch (error) {
       console.error('Failed to load document');
     }
