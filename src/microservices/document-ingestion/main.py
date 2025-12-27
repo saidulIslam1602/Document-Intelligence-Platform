@@ -1169,29 +1169,9 @@ async def delete_document(
         logger.error(f"Error deleting document {document_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
 
-# Old Azure-based delete code below (not used in local mode)
-'''
-@app.delete("/documents/{document_id}_old")
-async def delete_document_azure(
-    document_id: str,
-    user_id: str = Depends(get_current_user)
-):
-    """Delete a document and its associated data (Azure version)"""
-    try:
-        container = database.get_container_client("documents")
-        
-        # Get document record
-        document_record = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: container.read_item(
-                item=document_id,
-                partition_key=user_id
-            )
-        )
-        
-        # Delete from blob storage
-        blob_client = blob_service_client.get_blob_client(
-            container="documents",
+# Old Azure-based delete code removed (not used in local PostgreSQL mode)
+
+# Helper functions
             blob=document_record.get("blob_path")
         )
         
