@@ -38,7 +38,7 @@ FORM_RECOGNIZER_KEY=mock-key-for-local-dev
 COGNITIVE_SEARCH_ENDPOINT=http://localhost:8000/mock/search
 COGNITIVE_SEARCH_KEY=mock-key-for-local-dev
 
-# OpenAI - Set your key here or leave empty to use mock
+# OpenAI - Add your API key here to enable real AI (or leave empty for mocks)
 OPENAI_API_KEY=
 OPENAI_ENDPOINT=https://api.openai.com/v1
 OPENAI_DEPLOYMENT=gpt-3.5-turbo

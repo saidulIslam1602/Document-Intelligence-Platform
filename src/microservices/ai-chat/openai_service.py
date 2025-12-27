@@ -497,42 +497,80 @@ import logging
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 import numpy as np
-from openai import AzureOpenAI
+from openai import AzureOpenAI, OpenAI
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexClient
 from azure.search.documents.models import VectorizedQuery
-from azure.core.credentials import AzureKeyCredential
+import os
 
 from src.shared.config.settings import config_manager
 from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus
+from src.shared.mocks.azure_mocks import MockOpenAI
 
 class OpenAIService:
-    """Azure OpenAI service for advanced document processing"""
+    """Hybrid OpenAI service supporting Azure OpenAI, standard OpenAI, and local mocks"""
     
     def __init__(self, event_bus: EventBus = None):
         self.config = config_manager.get_azure_config()
         self.event_bus = event_bus
         self.logger = logging.getLogger(__name__)
         
-        # Initialize Azure OpenAI client
-        self.client = AzureOpenAI(
-            api_key=self.config.openai_api_key,
-            api_version="2024-02-15-preview",
-            azure_endpoint=self.config.openai_endpoint
-        )
+        # Determine which OpenAI client to use
+        self.use_mock = os.getenv("USE_MOCK_SERVICES", "false").lower() == "true"
+        self.openai_key = os.getenv("OPENAI_API_KEY", "")
+        self.azure_endpoint = getattr(self.config, 'openai_endpoint', '')
         
-        # Initialize Cognitive Search client
-        self.search_client = SearchClient(
-            endpoint=self.config.cognitive_search_endpoint,
-            index_name="documents",
-            credential=AzureKeyCredential(self.config.cognitive_search_key)
-        )
+        self.client = None
+        self.client_type = None
+        self.mock_client = MockOpenAI()
+        
+        # Try to initialize OpenAI clients in order of preference
+        if not self.use_mock:
+            # Try Azure OpenAI first (if configured)
+            if self.azure_endpoint and hasattr(self.config, 'openai_api_key') and self.config.openai_api_key:
+                try:
+                    self.client = AzureOpenAI(
+                        api_key=self.config.openai_api_key,
+                        api_version="2024-02-15-preview",
+                        azure_endpoint=self.azure_endpoint
+                    )
+                    self.client_type = "azure"
+                    self.logger.info("Using Azure OpenAI")
+                except Exception as e:
+                    self.logger.warning(f"Azure OpenAI init failed: {e}")
+            
+            # Fall back to standard OpenAI if Azure not available
+            if not self.client and self.openai_key and self.openai_key.startswith('sk-'):
+                try:
+                    self.client = OpenAI(api_key=self.openai_key)
+                    self.client_type = "openai"
+                    self.logger.info("Using standard OpenAI API")
+                except Exception as e:
+                    self.logger.warning(f"Standard OpenAI init failed: {e}")
+        
+        # Use mocks if no real client available
+        if not self.client:
+            self.client_type = "mock"
+            self.logger.info("Using mock OpenAI services")
+        
+        # Initialize Cognitive Search client (or use local alternative)
+        try:
+            if hasattr(self.config, 'cognitive_search_endpoint') and self.config.cognitive_search_endpoint:
+                self.search_client = SearchClient(
+                    endpoint=self.config.cognitive_search_endpoint,
+                    index_name="documents",
+                    credential=AzureKeyCredential(self.config.cognitive_search_key)
+                )
+            else:
+                self.search_client = None  # Will use local search
+        except:
+            self.search_client = None
         
         # Model configurations
         self.models = {
-            "gpt4": "gpt-4",
-            "gpt35": "gpt-35-turbo",
+            "gpt4": "gpt-4" if self.client_type == "azure" else "gpt-4-turbo-preview",
+            "gpt35": "gpt-35-turbo" if self.client_type == "azure" else "gpt-3.5-turbo",
             "embedding": "text-embedding-ada-002",
             "davinci": "text-davinci-003"
         }
@@ -830,22 +868,36 @@ class OpenAIService:
             return ""
     
     async def _call_openai(self, model: str, **kwargs) -> Any:
-        """Make async call to Azure OpenAI"""
+        """Make async call to OpenAI (Azure, standard, or mock)"""
         try:
-            # Run the OpenAI call in a thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None, 
-                lambda: self.client.chat.completions.create(
-                    model=model,
-                    **kwargs
+            # If using mock
+            if self.client_type == "mock":
+                messages = kwargs.get('messages', [])
+                return self.mock_client.chat_completion(messages, model)
+            
+            # If using real OpenAI (Azure or standard)
+            if self.client:
+                # Run the OpenAI call in a thread pool to avoid blocking
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None, 
+                    lambda: self.client.chat.completions.create(
+                        model=model,
+                        **kwargs
+                    )
                 )
-            )
-            return response
+                return response
+            
+            # Fallback to mock if client not initialized
+            self.logger.warning("No OpenAI client available, using mock")
+            messages = kwargs.get('messages', [])
+            return self.mock_client.chat_completion(messages, model)
             
         except Exception as e:
-            self.logger.error(f"OpenAI API call failed: {str(e)}")
-            raise
+            self.logger.error(f"OpenAI API call failed: {str(e)}, falling back to mock")
+            # Fallback to mock on error
+            messages = kwargs.get('messages', [])
+            return self.mock_client.chat_completion(messages, model)
     
     async def process_document_batch(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Process multiple documents in batch"""
