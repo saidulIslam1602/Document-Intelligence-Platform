@@ -862,7 +862,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 class AuthenticationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Skip authentication for health checks and public endpoints
-        if request.url.path in ["/health", "/docs", "/openapi.json"]:
+        public_paths = ["/health", "/docs", "/openapi.json", "/auth/login", "/auth/register"]
+        if request.url.path in public_paths or request.url.path.startswith("/auth/"):
             return await call_next(request)
         
         # Get authorization header
@@ -1153,13 +1154,23 @@ async def route_llmops_requests(request: Request, path: str):
     """Route requests to AI processing service for LLMOps"""
     return await route_request(request, "ai-processing", f"/llmops/{path}")
 
+# Login/Register request models
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    username: str
+
 # Authentication endpoints
 @app.post("/auth/login")
-async def login(email: str, password: str):
+async def login(request: LoginRequest):
     """User login endpoint"""
     try:
         # Validate credentials (in production, this would check against database)
-        user = await validate_credentials(email, password)
+        user = await validate_credentials(request.email, request.password)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
@@ -1169,11 +1180,20 @@ async def login(email: str, password: str):
         # Update last login
         await update_last_login(user.user_id)
         
+        # Extract username from email for frontend
+        username = user.email.split('@')[0]
+        
         return {
             "access_token": token,
             "token_type": "bearer",
             "expires_in": 3600,
-            "user": user.dict()
+            "user": {
+                "id": user.user_id,
+                "email": user.email,
+                "username": username,
+                "role": user.role,
+                "status": "active"
+            }
         }
         
     except HTTPException:
@@ -1181,6 +1201,43 @@ async def login(email: str, password: str):
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/auth/register")
+async def register(request: RegisterRequest):
+    """User registration endpoint"""
+    try:
+        # In production, check if user exists first
+        # For now, create user directly
+        user_id = f"user_{hashlib.md5(request.email.encode()).hexdigest()[:8]}"
+        user = User(
+            user_id=user_id,
+            email=request.email,
+            role="user",
+            permissions=["read", "write"],
+            created_at=datetime.utcnow(),
+            last_login=None
+        )
+        
+        # Generate JWT token
+        token = generate_jwt_token(user)
+        
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": 3600,
+            "user": {
+                "id": user_id,
+                "email": request.email,
+                "username": request.username,
+                "role": "user",
+                "status": "active"
+            },
+            "message": "Registration successful"
+        }
+        
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Registration failed")
 
 @app.post("/auth/refresh")
 async def refresh_token(current_token: str = Depends(security)):
@@ -1400,8 +1457,11 @@ async def validate_credentials(email: str, password: str) -> Optional[User]:
         # In production, this would validate against a database
         # Validate credentials (simplified for development)
         if email and password:
+            user_id = f"user_{hashlib.md5(email.encode()).hexdigest()[:8]}"
+            # Extract username from email
+            username = email.split('@')[0]
             return User(
-                user_id=f"user_{hashlib.md5(email.encode()).hexdigest()[:8]}",
+                user_id=user_id,
                 email=email,
                 role="user",
                 permissions=["read", "write"],
