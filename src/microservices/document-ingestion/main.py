@@ -1169,10 +1169,7 @@ async def delete_document(
         logger.error(f"Error deleting document {document_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
 
-# Old Azure-based delete code removed (not used in local PostgreSQL mode)
-
 # Helper functions
-            blob=document_record.get("blob_path")
         )
         
         try:
