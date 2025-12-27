@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: di-postgres-local
+    environment:
+      POSTGRES_DB: documentintelligence
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-local-data:/var/lib/postgresql/data
+    networks:
+      - di-local-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: di-redis-local
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-local-data:/data
+    networks:
+      - di-local-network
+
+networks:
+  di-local-network:
+    driver: bridge
+
+volumes:
+  postgres-local-data:
+  redis-local-data:

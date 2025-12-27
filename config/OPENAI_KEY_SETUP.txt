@@ -1,0 +1,77 @@
+OpenAI API Key Configuration
+
+OPTION 1: Use Mock Services (No API Key Required)
+--------------------------------------------------
+For demonstration purposes, the platform includes mock services
+that simulate OpenAI responses. No API key needed.
+
+Setup:
+  1. Keep OPENAI_API_KEY empty in .env.local
+  2. Set USE_MOCK_SERVICES=true
+  3. Mock responses will be used automatically
+
+Mock services provide realistic responses for:
+  - Chat completions
+  - Entity extraction
+  - Document classification
+  - Text summarization
+
+
+OPTION 2: Use Real OpenAI API
+------------------------------
+For production or real AI capabilities:
+
+1. Get API Key:
+   - Visit https://platform.openai.com/api-keys
+   - Sign in or create account
+   - Click "Create new secret key"
+   - Copy the key (starts with sk-)
+
+2. Configure:
+   Edit .env.local:
+     OPENAI_API_KEY=sk-your-actual-key-here
+     USE_MOCK_SERVICES=false
+
+3. Restart services:
+   ./scripts/stop_local.sh
+   ./scripts/run_local.sh
+
+
+OPTION 3: Use Azure OpenAI
+---------------------------
+If you have Azure OpenAI deployment:
+
+1. Get Azure OpenAI credentials from Azure Portal
+
+2. Configure in .env.local:
+   OPENAI_API_KEY=your-azure-key
+   OPENAI_ENDPOINT=https://your-instance.openai.azure.com/
+   OPENAI_DEPLOYMENT=your-deployment-name
+   USE_MOCK_SERVICES=false
+
+3. Restart services
+
+
+Cost Information
+----------------
+OpenAI API Pricing (as of 2024):
+  - GPT-3.5-Turbo: ~$0.002 per 1K tokens
+  - GPT-4: ~$0.03 per 1K tokens
+
+For demonstration:
+  - Mock services are FREE
+  - No external API calls
+  - No costs incurred
+
+
+Which Option to Choose?
+------------------------
+For Demonstrations/Testing:
+  Use Option 1 (Mocks) - FREE, instant setup
+
+For Development:
+  Use Option 2 (OpenAI) - Pay per use
+
+For Production:
+  Use Option 3 (Azure OpenAI) - Enterprise features
+
