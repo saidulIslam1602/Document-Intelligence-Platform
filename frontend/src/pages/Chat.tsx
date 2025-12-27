@@ -61,12 +61,14 @@ export default function Chat() {
   };
 
   const suggestedQuestions = [
-    'Analyze my invoices and show me spending patterns',
-    'Which vendors have I worked with most?',
-    'Show me documents with highest amounts',
-    'Summarize all invoices from this month',
-    'What entities were extracted from my documents?',
-    'Find documents related to a specific vendor',
+    'What was my total spending last month compared to this month?',
+    'Which vendor do I spend the most with? Show me the breakdown.',
+    'Calculate average invoice amount by vendor',
+    'Show me spending trends over the last 3 months',
+    'What percentage of my budget went to Amazon invoices?',
+    'Identify any unusual spending patterns or anomalies',
+    'Compare my Q1 vs Q2 spending - what changed?',
+    'What are my top 5 expenses this quarter?',
   ];
 
   return (

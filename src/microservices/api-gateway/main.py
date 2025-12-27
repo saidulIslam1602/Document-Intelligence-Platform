@@ -1631,65 +1631,151 @@ async def route_mcp_requests(request: Request, path: str):
 
 @app.post("/chat/message")
 async def chat_message(request: Request):
-    """AI Chat endpoint - intelligent document analysis powered by OpenAI"""
+    """AI Chat endpoint - Advanced analytics, reasoning, and calculations powered by OpenAI"""
     try:
         body = await request.json()
         user_message = body.get('message', '')
         user_id = request.state.user_id if hasattr(request.state, 'user_id') else 'anonymous'
         
-        # Get user's documents from database for context
+        # Get comprehensive data from database for analytics
         try:
-            db = DatabaseService()
-            user_documents = db.get_documents(limit=50, user_id=user_id)
+            from datetime import datetime, timedelta
+            from collections import defaultdict
+            import re
             
-            # Build context from documents
+            db = DatabaseService()
+            user_documents = db.get_documents(limit=200, user_id=user_id)  # Increased limit for better analytics
+            
+            # Build comprehensive analytics context
             document_context = []
             total_amount = 0
-            vendors = set()
+            vendors = defaultdict(lambda: {'count': 0, 'total': 0, 'invoices': []})
+            monthly_spending = defaultdict(float)
+            currency_totals = defaultdict(float)
+            documents_by_date = []
             
             for doc in user_documents:
                 if doc.get('extracted_data'):
                     data = doc['extracted_data']
-                    if data.get('vendor_name'):
-                        vendors.add(data['vendor_name'])
-                    if data.get('total_amount'):
-                        total_amount += float(data['total_amount'] or 0)
+                    vendor = data.get('vendor_name', 'Unknown')
+                    amount = float(data.get('total_amount') or 0)
+                    currency = data.get('currency_code', 'USD')
+                    invoice_date = data.get('invoice_date')
+                    
+                    # Aggregate by vendor
+                    vendors[vendor]['count'] += 1
+                    vendors[vendor]['total'] += amount
+                    vendors[vendor]['invoices'].append({
+                        'invoice_number': data.get('invoice_number'),
+                        'date': invoice_date,
+                        'amount': amount
+                    })
+                    
+                    # Aggregate by month
+                    if invoice_date:
+                        try:
+                            date_obj = datetime.fromisoformat(invoice_date.replace('Z', '+00:00'))
+                            month_key = date_obj.strftime('%Y-%m')
+                            monthly_spending[month_key] += amount
+                            documents_by_date.append((date_obj, vendor, amount))
+                        except:
+                            pass
+                    
+                    # Aggregate by currency
+                    currency_totals[currency] += amount
+                    total_amount += amount
                     
                     document_context.append({
                         'filename': doc['filename'],
-                        'vendor': data.get('vendor_name'),
+                        'vendor': vendor,
                         'invoice_number': data.get('invoice_number'),
-                        'date': data.get('invoice_date'),
-                        'amount': data.get('total_amount'),
-                        'currency': data.get('currency_code', 'USD')
+                        'date': invoice_date,
+                        'amount': amount,
+                        'currency': currency,
+                        'status': doc.get('status'),
+                        'uploaded_at': doc.get('uploaded_at')
                     })
             
-            # Prepare context for AI
-            context_summary = f"User has {len(user_documents)} documents. "
-            context_summary += f"Total spending: ${total_amount:.2f}. "
-            context_summary += f"Vendors: {', '.join(list(vendors)[:10])}. "
+            # Sort and calculate trends
+            documents_by_date.sort(key=lambda x: x[0], reverse=True)
+            sorted_vendors = sorted(vendors.items(), key=lambda x: x[1]['total'], reverse=True)
+            sorted_months = sorted(monthly_spending.items())
             
-            # Call OpenAI for intelligent response
+            # Calculate time-based metrics
+            now = datetime.now()
+            last_7_days = [d for d in documents_by_date if (now - d[0]).days <= 7]
+            last_30_days = [d for d in documents_by_date if (now - d[0]).days <= 30]
+            last_90_days = [d for d in documents_by_date if (now - d[0]).days <= 90]
+            
+            # Build comprehensive analytics summary
+            analytics_summary = {
+                'total_documents': len(user_documents),
+                'total_spending': total_amount,
+                'unique_vendors': len(vendors),
+                'currency_breakdown': dict(currency_totals),
+                'top_vendors': [
+                    {
+                        'name': v[0],
+                        'invoice_count': v[1]['count'],
+                        'total_spent': v[1]['total'],
+                        'avg_per_invoice': v[1]['total'] / v[1]['count']
+                    }
+                    for v in sorted_vendors[:10]
+                ],
+                'monthly_spending': dict(sorted_months),
+                'recent_activity': {
+                    'last_7_days': {
+                        'count': len(last_7_days),
+                        'total': sum(d[2] for d in last_7_days)
+                    },
+                    'last_30_days': {
+                        'count': len(last_30_days),
+                        'total': sum(d[2] for d in last_30_days)
+                    },
+                    'last_90_days': {
+                        'count': len(last_90_days),
+                        'total': sum(d[2] for d in last_90_days)
+                    }
+                }
+            }
+            
+            # Call OpenAI for intelligent response with advanced analytics
             from openai import OpenAI
             openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
             
-            system_prompt = f"""You are an intelligent document assistant for a document intelligence platform.
-The user has uploaded invoices and documents that you can analyze.
+            system_prompt = f"""You are an advanced AI analytics assistant for a document intelligence platform. You specialize in:
+- Financial analysis and calculations
+- Trend identification and forecasting
+- Vendor comparison and insights
+- Time-based analytics (daily, weekly, monthly, yearly)
+- Statistical reasoning and pattern recognition
 
-Context about user's documents:
-{context_summary}
+COMPREHENSIVE DATA AVAILABLE:
+{str(analytics_summary)}
 
-Document details:
-{str(document_context[:10])}
+DETAILED DOCUMENT LIST (first 20):
+{str(document_context[:20])}
 
-Your capabilities:
-- Analyze spending patterns and trends
-- Identify vendors and payment terms
-- Extract and summarize financial information
-- Provide insights on document data
-- Answer questions about invoices and documents
+YOUR ANALYTICAL CAPABILITIES:
+✓ Calculate totals, averages, percentages, growth rates
+✓ Compare vendors, time periods, spending patterns
+✓ Identify trends, anomalies, and insights
+✓ Answer "what if" and forecasting questions
+✓ Provide reasoning behind financial patterns
+✓ Generate summaries and reports
+✓ Time-range analysis (last week, month, quarter, year)
 
-Be helpful, concise, and data-driven. If you reference specific amounts or vendors, cite the actual data."""
+INSTRUCTIONS:
+- Perform accurate calculations using the data provided
+- Show your work when doing math (e.g., "23 invoices × $1,234 avg = $28,382")
+- Cite specific numbers and sources from the data
+- Identify trends and provide insights
+- Be precise with dates, amounts, and percentages
+- For time-based queries, use the recent_activity data
+- Compare periods when relevant (e.g., "30% higher than last month")
+- Provide actionable recommendations when appropriate
+
+Be analytical, precise, and insightful. Always ground your answers in the actual data."""
 
             completion = openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -1697,8 +1783,8 @@ Be helpful, concise, and data-driven. If you reference specific amounts or vendo
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                temperature=0.7,
-                max_tokens=500
+                temperature=0.3,  # Lower temperature for more precise analytics
+                max_tokens=800     # More tokens for detailed analytical responses
             )
             
             response_text = completion.choices[0].message.content
@@ -1706,7 +1792,7 @@ Be helpful, concise, and data-driven. If you reference specific amounts or vendo
         except Exception as ai_error:
             logger.warning(f"AI processing failed: {str(ai_error)}, using fallback")
             # Fallback to basic response if OpenAI fails
-            response_text = f"I can help you analyze your documents. You have uploaded documents that I can search and analyze. Try asking specific questions about vendors, amounts, or dates."
+            response_text = f"I can help you analyze your documents. You have uploaded documents that I can search and analyze. Try asking specific questions about vendors, amounts, dates, or trends."
         
         return {
             "content": response_text,
