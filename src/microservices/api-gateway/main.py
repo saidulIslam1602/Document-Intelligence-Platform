@@ -1288,6 +1288,32 @@ async def logout(current_token: str = Depends(security)):
         logger.error(f"Logout error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.get("/auth/me")
+async def get_current_user_info(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current user information from JWT token"""
+    try:
+        # Validate token and extract user info
+        user = await validate_token(credentials.credentials)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        
+        # Extract username from email
+        username = user.email.split('@')[0]
+        
+        return {
+            "id": user.user_id,
+            "email": user.email,
+            "username": username,
+            "role": user.role,
+            "status": "active"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get current user error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 # Dependency injection
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(lambda: None)) -> User:
     """Get current authenticated user - Development mode: No auth required"""
