@@ -532,9 +532,10 @@ Protocol: Model Context Protocol 0.9.0
 import asyncio
 import logging
 import json
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
@@ -543,6 +544,21 @@ import httpx
 from src.shared.config.settings import config_manager
 from mcp_tools import MCPToolRegistry
 from mcp_resources import MCPResourceManager
+from mcp_auth import (
+    get_current_user, 
+    User, 
+    AccessController, 
+    AuditLogger,
+    JWTValidator,
+    UserRole,
+    generate_test_tokens
+)
+from mcp_rate_limiter import (
+    rate_limiter,
+    check_mcp_rate_limits,
+    get_rate_limit_info,
+    RateLimitMiddleware
+)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -559,9 +575,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Security
-security = HTTPBearer()
 
 # Global variables
 config = config_manager.get_azure_config()
@@ -612,11 +625,6 @@ class MCPCapabilitiesResponse(BaseModel):
     capabilities: Dict[str, Any]
     tools: List[Dict[str, Any]]
     resources: List[Dict[str, Any]]
-
-# Dependency injection
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
-    """Extract user ID from JWT token"""
-    return "user_123"
 
 # Health check endpoint
 @app.get("/health")
@@ -688,20 +696,51 @@ async def list_tools():
 @app.post("/mcp/tools/execute", response_model=MCPToolResponse)
 async def execute_tool(
     request: MCPToolRequest,
-    user_id: str = Depends(get_current_user)
+    fastapi_request: Request,
+    response: Response,
+    user: User = Depends(get_current_user)
 ):
-    """Execute an MCP tool"""
+    """Execute an MCP tool with authentication, authorization, rate limiting, and audit logging"""
+    start_time = datetime.utcnow()
+    success = False
+    error_msg = None
+    
     try:
-        start_time = datetime.utcnow()
+        # 1. Check rate limits
+        await check_mcp_rate_limits(
+            request=fastapi_request,
+            user_id=user.user_id,
+            user_role=user.role,
+            operation_type="tool",
+            operation_name=request.tool_name
+        )
         
-        # Execute tool
+        # 2. Check access permissions
+        AccessController.check_tool_access(user, request.tool_name)
+        
+        # 3. Execute tool
         result = await tool_registry.execute_tool(
             request.tool_name,
             request.parameters,
-            request.context
+            {"user_id": user.user_id, "role": user.role}
         )
         
         execution_time = (datetime.utcnow() - start_time).total_seconds()
+        success = True
+        
+        # 4. Audit log
+        AuditLogger.log_tool_execution(
+            user_id=user.user_id,
+            tool_name=request.tool_name,
+            parameters=request.parameters,
+            success=True,
+            execution_time=execution_time
+        )
+        
+        # 5. Add rate limit headers
+        await RateLimitMiddleware.add_rate_limit_headers(
+            fastapi_request, response, user.user_id, user.role
+        )
         
         return MCPToolResponse(
             tool_name=request.tool_name,
@@ -711,16 +750,39 @@ async def execute_tool(
             timestamp=datetime.utcnow()
         )
         
+    except HTTPException:
+        # Re-raise HTTP exceptions (rate limit, auth, etc.)
+        raise
     except ValueError as e:
-        logger.error(f"Invalid tool request: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        error_msg = str(e)
+        logger.error(f"Invalid tool request: {error_msg}")
+        AuditLogger.log_tool_execution(
+            user_id=user.user_id,
+            tool_name=request.tool_name,
+            parameters=request.parameters,
+            success=False,
+            error=error_msg
+        )
+        raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
-        logger.error(f"Error executing tool {request.tool_name}: {str(e)}")
+        error_msg = str(e)
+        execution_time = (datetime.utcnow() - start_time).total_seconds()
+        logger.error(f"Error executing tool {request.tool_name}: {error_msg}")
+        
+        AuditLogger.log_tool_execution(
+            user_id=user.user_id,
+            tool_name=request.tool_name,
+            parameters=request.parameters,
+            success=False,
+            error=error_msg,
+            execution_time=execution_time
+        )
+        
         return MCPToolResponse(
             tool_name=request.tool_name,
             success=False,
-            error=str(e),
-            execution_time=0.0,
+            error=error_msg,
+            execution_time=execution_time,
             timestamp=datetime.utcnow()
         )
 
@@ -743,14 +805,47 @@ async def list_resources():
 @app.post("/mcp/resources/read", response_model=MCPResourceResponse)
 async def read_resource(
     request: MCPResourceRequest,
-    user_id: str = Depends(get_current_user)
+    fastapi_request: Request,
+    response: Response,
+    user: User = Depends(get_current_user)
 ):
-    """Read an MCP resource"""
+    """Read an MCP resource with authentication, authorization, rate limiting, and audit logging"""
     try:
-        # Read resource
+        # Parse resource type from URI
+        uri_parts = request.resource_uri.split("://")
+        if len(uri_parts) >= 2:
+            resource_type = uri_parts[0]
+        else:
+            raise ValueError(f"Invalid resource URI: {request.resource_uri}")
+        
+        # 1. Check rate limits
+        await check_mcp_rate_limits(
+            request=fastapi_request,
+            user_id=user.user_id,
+            user_role=user.role,
+            operation_type="resource",
+            operation_name=None
+        )
+        
+        # 2. Check access permissions
+        AccessController.check_resource_access(user, resource_type)
+        
+        # 3. Read resource
         data = await resource_manager.read_resource(
             request.resource_uri,
             request.parameters
+        )
+        
+        # 4. Audit log
+        AuditLogger.log_resource_access(
+            user_id=user.user_id,
+            resource_uri=request.resource_uri,
+            success=True
+        )
+        
+        # 5. Add rate limit headers
+        await RateLimitMiddleware.add_rate_limit_headers(
+            fastapi_request, response, user.user_id, user.role
         )
         
         return MCPResourceResponse(
@@ -760,15 +855,34 @@ async def read_resource(
             timestamp=datetime.utcnow()
         )
         
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except ValueError as e:
-        logger.error(f"Invalid resource request: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        error_msg = str(e)
+        logger.error(f"Invalid resource request: {error_msg}")
+        AuditLogger.log_resource_access(
+            user_id=user.user_id,
+            resource_uri=request.resource_uri,
+            success=False,
+            error=error_msg
+        )
+        raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
-        logger.error(f"Error reading resource {request.resource_uri}: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"Error reading resource {request.resource_uri}: {error_msg}")
+        
+        AuditLogger.log_resource_access(
+            user_id=user.user_id,
+            resource_uri=request.resource_uri,
+            success=False,
+            error=error_msg
+        )
+        
         return MCPResourceResponse(
             resource_uri=request.resource_uri,
             success=False,
-            error=str(e),
+            error=error_msg,
             timestamp=datetime.utcnow()
         )
 
@@ -776,33 +890,53 @@ async def read_resource(
 @app.post("/mcp/invoice/extract")
 async def extract_invoice_data(
     document_id: str,
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user)
 ):
     """Extract invoice data using Form Recognizer (MCP tool wrapper)"""
     try:
+        # Check permissions
+        AccessController.check_tool_access(user, "extract_invoice_data")
+        
         result = await tool_registry.execute_tool(
             "extract_invoice_data",
             {"document_id": document_id},
-            {"user_id": user_id}
+            {"user_id": user.user_id, "role": user.role}
         )
+        
+        AuditLogger.log_tool_execution(
+            user_id=user.user_id,
+            tool_name="extract_invoice_data",
+            parameters={"document_id": document_id},
+            success=True
+        )
+        
         return result
         
     except Exception as e:
         logger.error(f"Error extracting invoice data: {str(e)}")
+        AuditLogger.log_tool_execution(
+            user_id=user.user_id,
+            tool_name="extract_invoice_data",
+            parameters={"document_id": document_id},
+            success=False,
+            error=str(e)
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 # Invoice validation tool endpoint (convenience)
 @app.post("/mcp/invoice/validate")
 async def validate_invoice(
     invoice_data: Dict[str, Any],
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user)
 ):
     """Validate invoice data using Data Quality Service (MCP tool wrapper)"""
     try:
+        AccessController.check_tool_access(user, "validate_invoice")
+        
         result = await tool_registry.execute_tool(
             "validate_invoice",
             {"invoice_data": invoice_data},
-            {"user_id": user_id}
+            {"user_id": user.user_id, "role": user.role}
         )
         return result
         
@@ -814,17 +948,17 @@ async def validate_invoice(
 @app.post("/mcp/document/classify")
 async def classify_document(
     document_id: str,
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user)
 ):
     """Classify document using ML models (MCP tool wrapper)"""
     try:
+        AccessController.check_tool_access(user, "classify_document")
         result = await tool_registry.execute_tool(
             "classify_document",
             {"document_id": document_id},
-            {"user_id": user_id}
+            {"user_id": user.user_id, "role": user.role}
         )
         return result
-        
     except Exception as e:
         logger.error(f"Error classifying document: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -833,17 +967,17 @@ async def classify_document(
 @app.get("/mcp/metrics/automation")
 async def get_automation_metrics(
     time_range: str = "24h",
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user)
 ):
     """Get automation metrics (MCP tool wrapper)"""
     try:
+        AccessController.check_tool_access(user, "get_automation_metrics")
         result = await tool_registry.execute_tool(
             "get_automation_metrics",
             {"time_range": time_range},
-            {"user_id": user_id}
+            {"user_id": user.user_id, "role": user.role}
         )
         return result
-        
     except Exception as e:
         logger.error(f"Error getting automation metrics: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -853,20 +987,17 @@ async def get_automation_metrics(
 async def create_fine_tuning_job(
     training_file: str,
     model: str = "gpt-3.5-turbo",
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user)
 ):
     """Create fine-tuning job (MCP tool wrapper)"""
     try:
+        AccessController.check_tool_access(user, "create_fine_tuning_job")
         result = await tool_registry.execute_tool(
             "create_fine_tuning_job",
-            {
-                "training_file": training_file,
-                "model": model
-            },
-            {"user_id": user_id}
+            {"training_file": training_file, "model": model},
+            {"user_id": user.user_id, "role": user.role}
         )
         return result
-        
     except Exception as e:
         logger.error(f"Error creating fine-tuning job: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -875,17 +1006,17 @@ async def create_fine_tuning_job(
 @app.post("/mcp/m365/process-document")
 async def process_m365_document(
     document_url: str,
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user)
 ):
     """Process M365 document (MCP tool wrapper)"""
     try:
+        AccessController.check_tool_access(user, "process_m365_document")
         result = await tool_registry.execute_tool(
             "process_m365_document",
             {"document_url": document_url},
-            {"user_id": user_id}
+            {"user_id": user.user_id, "role": user.role}
         )
         return result
-        
     except Exception as e:
         logger.error(f"Error processing M365 document: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1029,13 +1160,105 @@ async def mcp_read_resource(request: Request):
             }
         }
 
+# Security and Admin Endpoints
+
+@app.post("/mcp/auth/token")
+async def create_auth_token(user_id: str, role: str, metadata: Dict[str, Any] = None):
+    """
+    Create a JWT token for a user (Admin only - should be protected in production)
+    
+    In production, this should:
+    1. Be behind admin authentication
+    2. Validate user exists in your user database
+    3. Only allow admins to create tokens
+    """
+    try:
+        token = JWTValidator.create_token(user_id, role, metadata)
+        return {
+            "token": token,
+            "user_id": user_id,
+            "role": role,
+            "expires_in": "24 hours"
+        }
+    except Exception as e:
+        logger.error(f"Error creating token: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/mcp/auth/test-tokens")
+async def get_test_tokens():
+    """
+    Generate test tokens for development/testing
+    
+    WARNING: Disable this endpoint in production!
+    """
+    if os.getenv("ENVIRONMENT") == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Test tokens are disabled in production"
+        )
+    
+    tokens = generate_test_tokens()
+    return {
+        "message": "Test tokens generated for development",
+        "tokens": tokens,
+        "roles": list(tokens.keys())
+    }
+
+@app.get("/mcp/auth/me")
+async def get_current_user_info(user: User = Depends(get_current_user)):
+    """Get current authenticated user information"""
+    return {
+        "user_id": user.user_id,
+        "role": user.role,
+        "permissions": user.permissions[:10],  # Show first 10
+        "total_permissions": len(user.permissions),
+        "metadata": user.metadata
+    }
+
+@app.get("/mcp/rate-limits")
+async def get_rate_limits(user: User = Depends(get_current_user)):
+    """Get rate limit information for current user"""
+    try:
+        rate_limit_info = await get_rate_limit_info(user.user_id, user.role)
+        return rate_limit_info
+    except Exception as e:
+        logger.error(f"Error getting rate limit info: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/mcp/permissions")
+async def list_permissions(user: User = Depends(get_current_user)):
+    """List all available permissions and user's current permissions"""
+    from mcp_auth import MCPPermissions, ROLE_PERMISSIONS
+    
+    all_permissions = [
+        attr_value for attr_name, attr_value in vars(MCPPermissions).items()
+        if not attr_name.startswith('_') and isinstance(attr_value, str)
+    ]
+    
+    return {
+        "user_permissions": user.permissions,
+        "all_permissions": all_permissions,
+        "role_permissions": ROLE_PERMISSIONS,
+        "user_role": user.role
+    }
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
     """Initialize service on startup"""
+    logger.info("MCP Server starting...")
+    
+    # Initialize rate limiter
+    try:
+        await rate_limiter.initialize()
+        logger.info("Rate limiter initialized")
+    except Exception as e:
+        logger.warning(f"Rate limiter initialization failed: {e}")
+    
     logger.info("MCP Server started")
     logger.info(f"Registered {len(tool_registry.get_available_tools())} tools")
     logger.info(f"Registered {len(resource_manager.get_available_resources())} resources")
+    logger.info("Security features: JWT Authentication, RBAC, Rate Limiting, Audit Logging")
 
 # Shutdown event
 @app.on_event("shutdown")
