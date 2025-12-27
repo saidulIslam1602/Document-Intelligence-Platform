@@ -1392,6 +1392,26 @@ async def download_document_content(blob_path: str) -> bytes:
         logger.error(f"Error downloading document content: {str(e)}")
         raise
 
+async def extract_text_from_image(image_content: bytes) -> str:
+    """Extract text from image using OCR (Tesseract)"""
+    try:
+        from PIL import Image
+        import pytesseract
+        import io
+        
+        # Open image from bytes
+        image = Image.open(io.BytesIO(image_content))
+        
+        # Perform OCR
+        extracted_text = pytesseract.image_to_string(image)
+        
+        logger.info(f"OCR extracted {len(extracted_text)} characters from image")
+        return extracted_text
+        
+    except Exception as e:
+        logger.error(f"Error extracting text from image: {str(e)}")
+        return ""
+
 async def process_document_with_ai(
     document_content: bytes, 
     document: Dict[str, Any], 
@@ -1399,11 +1419,27 @@ async def process_document_with_ai(
 ) -> Dict[str, Any]:
     """Process document using AI services (OpenAI-only mode for local development)"""
     try:
-        # Extract text from document (simple text extraction for local mode)
-        try:
-            extracted_text = document_content.decode('utf-8')
-        except:
-            extracted_text = str(document_content)
+        # Detect if document is an image and extract text using OCR
+        content_type = document.get("content_type", "")
+        file_name = document.get("file_name", "").lower()
+        
+        is_image = (
+            content_type.startswith("image/") or 
+            file_name.endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))
+        )
+        
+        if is_image:
+            logger.info(f"Detected image file: {file_name}, performing OCR...")
+            extracted_text = await extract_text_from_image(document_content)
+            if not extracted_text or len(extracted_text.strip()) < 10:
+                logger.warning("OCR extracted minimal or no text from image")
+                extracted_text = "No readable text found in image"
+        else:
+            # Extract text from document (simple text extraction for text-based files)
+            try:
+                extracted_text = document_content.decode('utf-8')
+            except:
+                extracted_text = str(document_content)
         
         logger.info(f"Processing document with OpenAI (extracted {len(extracted_text)} characters)")
         
@@ -1420,7 +1456,8 @@ async def process_document_with_ai(
             "entities": entities.get("entities", []),
             "summary": summary.get("summary", ""),
             "processing_timestamp": datetime.utcnow().isoformat(),
-            "ai_models_used": ["openai_gpt"],
+            "ai_models_used": ["openai_gpt", "tesseract_ocr"] if is_image else ["openai_gpt"],
+            "ocr_used": is_image,
             "mode": "local_development"
         }
         
