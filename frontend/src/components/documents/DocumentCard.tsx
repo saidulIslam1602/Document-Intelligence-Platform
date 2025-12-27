@@ -10,9 +10,10 @@ interface DocumentCardProps {
     extractedEntities?: number;
   };
   onClick?: () => void;
+  onDelete?: (id: string, event: React.MouseEvent) => void;
 }
 
-export default function DocumentCard({ document, onClick }: DocumentCardProps) {
+export default function DocumentCard({ document, onClick, onDelete }: DocumentCardProps) {
   const formatFileSize = (bytes?: number) => {
     if (!bytes) return 'N/A';
     const mb = bytes / (1024 * 1024);
@@ -31,7 +32,7 @@ export default function DocumentCard({ document, onClick }: DocumentCardProps) {
   return (
     <div 
       onClick={onClick}
-      className="card hover:shadow-lg transition-shadow cursor-pointer"
+      className="card hover:shadow-lg transition-shadow cursor-pointer relative group"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -47,9 +48,20 @@ export default function DocumentCard({ document, onClick }: DocumentCardProps) {
             </p>
           )}
         </div>
-        <Badge variant={getStatusVariant(document.status)}>
-          {document.status}
-        </Badge>
+        <div className="flex flex-col items-end gap-2">
+          <Badge variant={getStatusVariant(document.status)}>
+            {document.status}
+          </Badge>
+          {onDelete && (
+            <button
+              onClick={(e) => onDelete(document.id, e)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-800 text-sm font-medium"
+              title="Delete document"
+            >
+              Delete
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

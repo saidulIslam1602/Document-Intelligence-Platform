@@ -237,14 +237,24 @@ Extraction Confidence: ${((docData.confidence_score || 0) * 100).toFixed(1)}%`;
     }
   };
 
-  const deleteDocument = async (docId: string) => {
-    if (!confirm('Are you sure you want to delete this document?')) return;
+  const deleteDocument = async (docId: string, event?: React.MouseEvent) => {
+    // Stop event propagation to prevent card click
+    if (event) {
+      event.stopPropagation();
+    }
+    
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) return;
     
     try {
       await api.delete(`/documents/${docId}`);
-      loadDocuments();
+      // Remove from local state immediately for better UX
+      setDocuments(prev => prev.filter(doc => doc.id !== docId));
+      setFilteredDocs(prev => prev.filter(doc => doc.id !== docId));
+      // Reload to ensure consistency
+      setTimeout(() => loadDocuments(), 500);
     } catch (error) {
       console.error('Failed to delete document');
+      alert('Failed to delete document. Please try again.');
     }
   };
 
@@ -285,6 +295,7 @@ Extraction Confidence: ${((docData.confidence_score || 0) * 100).toFixed(1)}%`;
                   key={doc.id}
                   document={doc}
                   onClick={() => viewDocument(doc.id)}
+                  onDelete={deleteDocument}
                 />
               ))}
             </div>
