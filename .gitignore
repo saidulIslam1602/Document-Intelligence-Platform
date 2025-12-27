@@ -4,38 +4,17 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
-venv/
 env/
+venv/
 ENV/
+.venv
 
-# Environment Variables
-.env
-.env.local
-.env.production
-local.env
-
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
@@ -45,35 +24,27 @@ Thumbs.db
 *.log
 logs/
 
-# Database
-*.db
-*.sqlite3
+# Environment
+.env
+.env.local
+.env.*.local
 
-# Azure
-.azure/
+# Credentials
+CREDENTIALS.txt
+**/credentials.txt
+**/CREDENTIALS.txt
 
 # Docker
 .dockerignore
 
-# Jupyter Notebook
-.ipynb_checkpoints/
+# Backup
+.backup/
 
-# Model files
-models/
-*.pkl
-*.joblib
+# Node
+node_modules/
+dist/
+.cache/
 
-# Data files
-data/
-*.csv
-*.json
-*.parquet
-
-# Secrets
-secrets/
-*.pem
-*.key
-
-# Temporary files
-tmp/
-temp/
+# Build
+build/
+*.egg-info/

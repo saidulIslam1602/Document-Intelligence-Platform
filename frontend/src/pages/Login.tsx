@@ -16,7 +16,16 @@ export default function Login({ setAuth }: { setAuth: (val: boolean) => void }) 
       const res = await api.post('/auth/login', { email, password });
       localStorage.setItem('token', res.data.access_token);
       setAuth(true);
-      navigate('/dashboard');
+      
+      // Role-based redirect
+      const userRole = res.data.user?.role || 'user';
+      if (userRole === 'admin') {
+        navigate('/admin');
+      } else if (userRole === 'developer') {
+        navigate('/analytics');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error) {
       alert('Login failed');
     } finally {

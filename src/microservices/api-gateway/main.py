@@ -651,7 +651,6 @@ import os
 import time
 import hashlib
 import jwt
-import psycopg2.extras
 from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends, Request, Response, status
@@ -661,10 +660,18 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import redis
-from azure.keyvault.secrets import SecretClient
-from azure.identity import DefaultAzureCredential
 import httpx
 from starlette.middleware.base import BaseHTTPMiddleware
+
+# Azure imports (optional for local development)
+try:
+    from azure.keyvault.secrets import SecretClient
+    from azure.identity import DefaultAzureCredential
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    SecretClient = None
+    DefaultAzureCredential = None
 
 from src.shared.config.settings import config_manager
 from src.shared.health import get_health_service
@@ -724,8 +731,8 @@ except Exception as e:
     logger.warning("Rate limiting and caching will be degraded")
     redis_client = None
 
-# Key Vault client for secrets
-if config.key_vault_url and config.key_vault_url.startswith("https://"):
+# Key Vault client for secrets (optional)
+if AZURE_AVAILABLE and config.key_vault_url and config.key_vault_url.startswith("https://"):
     try:
         key_vault_client = SecretClient(
             vault_url=config.key_vault_url,
@@ -736,7 +743,7 @@ if config.key_vault_url and config.key_vault_url.startswith("https://"):
         logger.warning(f"Failed to initialize Key Vault client: {str(e)}")
         key_vault_client = None
 else:
-    logger.info("Key Vault not configured - running in development mode")
+    logger.info("Key Vault not configured - running in local development mode")
     key_vault_client = None
 
 # Service endpoints
@@ -2209,12 +2216,31 @@ async def check_service_health(service_name: str) -> Dict[str, Any]:
 async def validate_credentials(email: str, password: str) -> Optional[User]:
     """Validate user credentials"""
     try:
-        # In production, this would validate against a database
-        # Validate credentials (simplified for development)
+        # Demo credentials for development/testing
+        demo_credentials = {
+            "demo@example.com": {"password": "demo123", "role": "admin"},
+            "user@example.com": {"password": "user123", "role": "user"},
+            "admin@example.com": {"password": "admin123", "role": "admin"},
+            "developer@example.com": {"password": "dev123", "role": "developer"}
+        }
+        
+        # Check demo credentials
+        if email in demo_credentials and demo_credentials[email]["password"] == password:
+            user_id = f"user_{hashlib.md5(email.encode()).hexdigest()[:8]}"
+            role = demo_credentials[email]["role"]
+            perms = ["read", "write", "admin"] if role == "admin" else ["read", "write"]
+            return User(
+                user_id=user_id,
+                email=email,
+                role=role,
+                permissions=perms,
+                created_at=datetime.utcnow(),
+                last_login=datetime.utcnow()
+            )
+        
+        # Fallback: allow any other credentials as regular user
         if email and password:
             user_id = f"user_{hashlib.md5(email.encode()).hexdigest()[:8]}"
-            # Extract username from email
-            username = email.split('@')[0]
             return User(
                 user_id=user_id,
                 email=email,
