@@ -756,6 +756,9 @@ RATE_LIMITS = {
     "analytics": {"requests": 2000, "window": 3600},  # 2000 analytics requests per hour
 }
 
+# In-memory storage for uploaded documents (for local dev)
+uploaded_documents = []
+
 # Pydantic models
 class User(BaseModel):
     user_id: str
@@ -1121,50 +1124,80 @@ async def reset_all_rate_limiters():
 
 # Service routing endpoints
 @app.get("/documents")
-async def get_documents(limit: int = 10, offset: int = 0):
-    """Get list of documents (mock endpoint for local dev)"""
+async def get_documents(limit: int = 100, offset: int = 0):
+    """Get list of documents (includes uploaded documents)"""
     logger.info(f"Fetching documents with limit={limit}, offset={offset}")
+    
+    # Mock documents (for demo purposes)
+    mock_documents = [
+        {
+            "id": "doc1",
+            "filename": "Sample Invoice.pdf",
+            "type": "invoice",
+            "status": "processed",
+            "uploaded_at": "2025-12-27T10:00:00Z",
+            "size": 45678,
+            "confidence": 0.95
+        },
+        {
+            "id": "doc2",
+            "filename": "Receipt.jpg",
+            "type": "receipt",
+            "status": "processed",
+            "uploaded_at": "2025-12-27T09:30:00Z",
+            "size": 12345,
+            "confidence": 0.92
+        },
+        {
+            "id": "doc3",
+            "filename": "Contract Agreement.pdf",
+            "type": "contract",
+            "status": "processing",
+            "uploaded_at": "2025-12-27T11:15:00Z",
+            "size": 98765,
+            "confidence": 0.88
+        }
+    ]
+    
+    # Combine mock documents with uploaded documents (most recent first)
+    all_documents = list(reversed(uploaded_documents)) + mock_documents
+    
+    # Apply pagination
+    paginated_docs = all_documents[offset:offset + limit]
+    
     return {
-        "documents": [
-            {
-                "id": "doc1",
-                "filename": "Sample Invoice.pdf",
-                "type": "invoice",
-                "status": "processed",
-                "uploaded_at": "2025-12-27T10:00:00Z",
-                "size": 45678,
-                "confidence": 0.95
-            },
-            {
-                "id": "doc2",
-                "filename": "Receipt.jpg",
-                "type": "receipt",
-                "status": "processed",
-                "uploaded_at": "2025-12-27T09:30:00Z",
-                "size": 12345,
-                "confidence": 0.92
-            },
-            {
-                "id": "doc3",
-                "filename": "Contract Agreement.pdf",
-                "type": "contract",
-                "status": "processing",
-                "uploaded_at": "2025-12-27T11:15:00Z",
-                "size": 98765,
-                "confidence": 0.88
-            }
-        ],
-        "total": 3,
+        "documents": paginated_docs,
+        "total": len(all_documents),
         "limit": limit,
         "offset": offset
     }
 
 @app.get("/documents/{document_id}")
 async def get_document_details(document_id: str):
-    """Get details for a specific document (mock endpoint for local dev)"""
+    """Get details for a specific document"""
     logger.info(f"Fetching document details for {document_id}")
     
-    # Mock document details based on document_id
+    # Check uploaded documents first
+    for doc in uploaded_documents:
+        if doc["id"] == document_id:
+            # Return document with mock extracted data
+            return {
+                **doc,
+                "extracted_data": {
+                    "invoice_number": f"INV-{document_id[-6:].upper()}",
+                    "date": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "total_amount": round(1000 + (hash(document_id) % 5000), 2),
+                    "currency": "USD",
+                    "vendor": f"Vendor {document_id[-4:].upper()}",
+                    "items": []
+                },
+                "entities": [
+                    {"type": "date", "value": datetime.utcnow().strftime("%Y-%m-%d"), "confidence": 0.96},
+                    {"type": "money", "value": f"${1000 + (hash(document_id) % 5000)}", "confidence": 0.94}
+                ]
+            }
+    
+    # Fallback to mock document details
     mock_documents = {
         "doc1": {
             "id": "doc1",
@@ -1249,14 +1282,48 @@ async def get_document_details(document_id: str):
 
 @app.post("/documents/upload")
 async def upload_document(request: Request):
-    """Upload a document (mock endpoint for local dev)"""
-    logger.info("Document upload request received")
-    return {
-        "document_id": f"doc_{hashlib.md5(str(datetime.utcnow()).encode()).hexdigest()[:8]}",
-        "status": "uploaded",
-        "message": "Document uploaded successfully (mock)",
-        "processing_status": "pending"
-    }
+    """Upload a document (stores in-memory for local dev)"""
+    try:
+        # Parse multipart form data
+        form = await request.form()
+        file = form.get("file")
+        
+        if not file:
+            raise HTTPException(status_code=400, detail="No file provided")
+        
+        # Generate document ID
+        doc_id = f"doc_{hashlib.md5(str(datetime.utcnow()).encode()).hexdigest()[:8]}"
+        
+        # Determine document type based on filename
+        filename = file.filename if hasattr(file, 'filename') else "unknown"
+        doc_type = "invoice" if "invoice" in filename.lower() else "document"
+        
+        # Store document metadata
+        document_metadata = {
+            "id": doc_id,
+            "filename": filename,
+            "type": doc_type,
+            "status": "processed",
+            "uploaded_at": datetime.utcnow().isoformat() + "Z",
+            "size": file.size if hasattr(file, 'size') else 0,
+            "confidence": 0.85 + (hash(filename) % 15) / 100  # Random confidence 0.85-0.99
+        }
+        
+        # Add to in-memory storage
+        uploaded_documents.append(document_metadata)
+        
+        logger.info(f"Document uploaded: {filename} (ID: {doc_id})")
+        
+        return {
+            "document_id": doc_id,
+            "status": "uploaded",
+            "message": "Document uploaded successfully",
+            "processing_status": "completed",
+            "filename": filename
+        }
+    except Exception as e:
+        logger.error(f"Upload error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.api_route("/documents/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def route_document_requests(request: Request, path: str):
@@ -1270,11 +1337,17 @@ async def route_processing_requests(request: Request, path: str):
 
 @app.get("/analytics/automation-metrics")
 async def get_automation_metrics():
-    """Get automation metrics (mock endpoint for local dev)"""
+    """Get automation metrics (includes uploaded documents)"""
     logger.info("Fetching automation metrics")
+    
+    # Calculate actual document counts
+    total_docs = len(uploaded_documents) + 3  # 3 mock documents
+    processed_docs = len([d for d in uploaded_documents if d.get("status") == "processed"])
+    processing_docs = len([d for d in uploaded_documents if d.get("status") == "processing"])
+    
     return {
-        "total_documents": 1247,
-        "processed_today": 45,
+        "total_documents": total_docs,
+        "processed_today": processed_docs,
         "success_rate": 98.5,
         "average_processing_time": 2.3,
         "total_cost": 123.45,
