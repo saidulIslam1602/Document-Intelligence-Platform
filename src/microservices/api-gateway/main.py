@@ -863,6 +863,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 # Authentication middleware
 class AuthenticationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Skip authentication for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         # Skip authentication for health checks and public endpoints
         public_paths = ["/health", "/docs", "/openapi.json", "/auth/login", "/auth/register"]
         if request.url.path in public_paths or request.url.path.startswith("/auth/"):
