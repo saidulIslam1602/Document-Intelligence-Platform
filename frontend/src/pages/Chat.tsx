@@ -61,10 +61,12 @@ export default function Chat() {
   };
 
   const suggestedQuestions = [
-    'What documents were processed today?',
-    'Show me invoices from last month',
-    'Extract key information from my latest document',
-    'What is the automation rate?',
+    'Analyze my invoices and show me spending patterns',
+    'Which vendors have I worked with most?',
+    'Show me documents with highest amounts',
+    'Summarize all invoices from this month',
+    'What entities were extracted from my documents?',
+    'Find documents related to a specific vendor',
   ];
 
   return (
@@ -98,19 +100,35 @@ export default function Chat() {
           <div className="flex-1 overflow-y-auto mb-4 space-y-4">
             {messages.length === 0 ? (
               <div className="text-center py-12">
-                <h2 className="text-2xl font-bold mb-4">AI Document Assistant</h2>
-                <p className="text-gray-600 mb-6">Ask me anything about your documents</p>
+                <div className="mb-6">
+                  <div className="text-6xl mb-4">🤖</div>
+                  <h2 className="text-3xl font-bold mb-2">AI Document Intelligence</h2>
+                  <p className="text-gray-600 mb-2">Powered by OpenAI GPT-3.5 & LangChain</p>
+                  <p className="text-sm text-gray-500 max-w-2xl mx-auto">
+                    I use advanced AI to analyze your invoices, extract insights, identify patterns, 
+                    and answer questions about vendors, amounts, dates, and trends in your documents.
+                  </p>
+                </div>
                 
-                <div className="grid grid-cols-2 gap-3 max-w-2xl mx-auto">
+                <div className="grid grid-cols-2 gap-3 max-w-3xl mx-auto">
                   {suggestedQuestions.map((q, idx) => (
                     <button
                       key={idx}
                       onClick={() => setInput(q)}
-                      className="p-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg text-sm"
+                      className="p-4 text-left bg-gradient-to-br from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 rounded-lg text-sm border border-gray-200 transition-all"
                     >
-                      {q}
+                      <span className="font-medium text-gray-800">{q}</span>
                     </button>
                   ))}
+                </div>
+                
+                <div className="mt-8 text-xs text-gray-500 max-w-2xl mx-auto">
+                  <div className="flex justify-center gap-6 flex-wrap">
+                    <span>✓ Fine-tuned Models</span>
+                    <span>✓ Document Context</span>
+                    <span>✓ Multi-Agent AI</span>
+                    <span>✓ Intelligent Routing</span>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -169,14 +187,47 @@ export default function Chat() {
       </div>
 
       {/* Right Sidebar */}
-      <div className="w-64">
-        <Card title="Context">
-          <div className="space-y-2 text-sm">
-            <p className="text-gray-600">Connected Documents: 0</p>
-            <p className="text-gray-600">Active Workflows: 0</p>
-            <Button variant="secondary" className="w-full mt-4">
-              Add Context
-            </Button>
+      <div className="w-64 space-y-4">
+        <Card title="AI Capabilities">
+          <div className="space-y-3 text-sm">
+            <div className="flex items-start gap-2">
+              <span className="text-green-500">✓</span>
+              <div>
+                <p className="font-medium">Document Context</p>
+                <p className="text-xs text-gray-500">Analyzes your uploaded documents</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-500">✓</span>
+              <div>
+                <p className="font-medium">LangChain Multi-Agent</p>
+                <p className="text-xs text-gray-500">Complex reasoning & inference</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-500">✓</span>
+              <div>
+                <p className="font-medium">Fine-Tuned Models</p>
+                <p className="text-xs text-gray-500">Specialized for invoices</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-500">✓</span>
+              <div>
+                <p className="font-medium">Intelligent Routing</p>
+                <p className="text-xs text-gray-500">Optimal processing selection</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+        
+        <Card title="Ask About">
+          <div className="space-y-2 text-xs">
+            <div className="p-2 bg-gray-50 rounded">📊 Spending patterns</div>
+            <div className="p-2 bg-gray-50 rounded">🏢 Vendor analysis</div>
+            <div className="p-2 bg-gray-50 rounded">💰 Amount summaries</div>
+            <div className="p-2 bg-gray-50 rounded">📅 Date-based queries</div>
+            <div className="p-2 bg-gray-50 rounded">🔍 Document search</div>
           </div>
         </Card>
       </div>

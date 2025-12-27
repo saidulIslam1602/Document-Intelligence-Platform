@@ -11,20 +11,24 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  // User view - Simple and clean
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { path: '/documents', label: 'Documents', icon: '📄' },
-  { path: '/entities', label: 'Entities', icon: '🏷️' },
-  { path: '/chat', label: 'AI Chat', icon: '💬' },
-  { path: '/search', label: 'Search', icon: '🔍' },
-  { path: '/processing-pipeline', label: 'Pipeline', icon: '🔄', developerOnly: true },
-  { path: '/workflows', label: 'Workflows', icon: '⚙️', developerOnly: true },
+  { path: '/documents', label: 'My Documents', icon: '📄' },
+  { path: '/chat', label: 'AI Assistant', icon: '💬' },
+  { path: '/about', label: 'Capabilities', icon: '🧠' },
+  { path: '/settings', label: 'Settings', icon: '⚙️' },
+  
+  // Admin/Developer only features
+  { path: '/entities', label: 'Entities', icon: '🏷️', developerOnly: true },
+  { path: '/search', label: 'Advanced Search', icon: '🔍', developerOnly: true },
   { path: '/analytics', label: 'Analytics', icon: '📈', developerOnly: true },
-  { path: '/mcp-tools', label: 'MCP Tools', icon: '🛠️', developerOnly: true },
+  { path: '/workflows', label: 'Workflows', icon: '⚙️', developerOnly: true },
+  { path: '/processing-pipeline', label: 'Pipeline', icon: '🔄', developerOnly: true },
   { path: '/webhooks', label: 'Webhooks', icon: '🔗', developerOnly: true },
   { path: '/api-keys', label: 'API Keys', icon: '🔑', developerOnly: true },
+  { path: '/mcp-tools', label: 'MCP Tools', icon: '🛠️', developerOnly: true },
   { path: '/audit-logs', label: 'Audit Logs', icon: '📋', developerOnly: true },
-  { path: '/admin', label: 'Admin', icon: '👤', adminOnly: true },
-  { path: '/settings', label: 'Settings', icon: '⚙' },
+  { path: '/admin', label: 'Admin Panel', icon: '👤', adminOnly: true },
 ];
 
 export default function Layout() {

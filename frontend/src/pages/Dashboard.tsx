@@ -16,6 +16,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   
   const canViewMetrics = user ? hasPermission(user.role, 'viewSystemMetrics') : false;
+  const isUser = user?.role === 'user';
 
   useEffect(() => {
     loadData();
@@ -50,11 +51,37 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {isUser && (
+        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white">
+          <h2 className="text-2xl font-bold mb-2">Welcome to Document Intelligence</h2>
+          <p className="text-blue-100 mb-4">
+            Upload your invoices and let our AI extract, analyze, and organize your data automatically.
+          </p>
+          <div className="flex gap-4">
+            <Button onClick={() => navigate('/documents')} variant="secondary" className="bg-white text-blue-600 hover:bg-gray-100">
+              Upload Documents
+            </Button>
+            <Button onClick={() => navigate('/chat')} variant="secondary" className="bg-blue-700 hover:bg-blue-800">
+              Ask AI Assistant
+            </Button>
+          </div>
+        </div>
+      )}
+      
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <Button onClick={() => navigate('/documents')}>
-          Upload Document
-        </Button>
+        <div>
+          <h1 className="text-3xl font-bold">
+            {isUser ? 'My Dashboard' : 'System Dashboard'}
+          </h1>
+          <p className="text-gray-600 text-sm mt-1">
+            {isUser ? 'View your documents and activity' : 'Monitor platform performance and analytics'}
+          </p>
+        </div>
+        {!isUser && (
+          <Button onClick={() => navigate('/documents')}>
+            Upload Document
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

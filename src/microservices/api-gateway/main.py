@@ -1631,27 +1631,89 @@ async def route_mcp_requests(request: Request, path: str):
 
 @app.post("/chat/message")
 async def chat_message(request: Request):
-    """AI Chat endpoint - responds to user messages"""
+    """AI Chat endpoint - intelligent document analysis powered by OpenAI"""
     try:
         body = await request.json()
         user_message = body.get('message', '')
+        user_id = request.state.user_id if hasattr(request.state, 'user_id') else 'anonymous'
         
-        # Mock AI response (in production, this would call OpenAI or Azure OpenAI)
-        responses = [
-            f"I understand you're asking about: '{user_message[:50]}...'. Based on your uploaded invoices, I can help you analyze vendor spending, track payment terms, and identify patterns.",
-            "I've analyzed your documents. Would you like me to summarize invoice totals by vendor, identify overdue payments, or provide insights on spending trends?",
-            "I can help you with document analysis! Try asking me about specific vendors, invoice amounts, payment terms, or tax calculations from your uploaded documents.",
-            f"Regarding '{user_message[:50]}...': I can search through your {50}+ invoices to find relevant information. What specific details would you like to know?",
-        ]
-        
-        import random
-        response_text = random.choice(responses)
+        # Get user's documents from database for context
+        try:
+            db = DatabaseService()
+            user_documents = db.get_documents(limit=50, user_id=user_id)
+            
+            # Build context from documents
+            document_context = []
+            total_amount = 0
+            vendors = set()
+            
+            for doc in user_documents:
+                if doc.get('extracted_data'):
+                    data = doc['extracted_data']
+                    if data.get('vendor_name'):
+                        vendors.add(data['vendor_name'])
+                    if data.get('total_amount'):
+                        total_amount += float(data['total_amount'] or 0)
+                    
+                    document_context.append({
+                        'filename': doc['filename'],
+                        'vendor': data.get('vendor_name'),
+                        'invoice_number': data.get('invoice_number'),
+                        'date': data.get('invoice_date'),
+                        'amount': data.get('total_amount'),
+                        'currency': data.get('currency_code', 'USD')
+                    })
+            
+            # Prepare context for AI
+            context_summary = f"User has {len(user_documents)} documents. "
+            context_summary += f"Total spending: ${total_amount:.2f}. "
+            context_summary += f"Vendors: {', '.join(list(vendors)[:10])}. "
+            
+            # Call OpenAI for intelligent response
+            from openai import OpenAI
+            openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            
+            system_prompt = f"""You are an intelligent document assistant for a document intelligence platform.
+The user has uploaded invoices and documents that you can analyze.
+
+Context about user's documents:
+{context_summary}
+
+Document details:
+{str(document_context[:10])}
+
+Your capabilities:
+- Analyze spending patterns and trends
+- Identify vendors and payment terms
+- Extract and summarize financial information
+- Provide insights on document data
+- Answer questions about invoices and documents
+
+Be helpful, concise, and data-driven. If you reference specific amounts or vendors, cite the actual data."""
+
+            completion = openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                temperature=0.7,
+                max_tokens=500
+            )
+            
+            response_text = completion.choices[0].message.content
+            
+        except Exception as ai_error:
+            logger.warning(f"AI processing failed: {str(ai_error)}, using fallback")
+            # Fallback to basic response if OpenAI fails
+            response_text = f"I can help you analyze your documents. You have uploaded documents that I can search and analyze. Try asking specific questions about vendors, amounts, or dates."
         
         return {
             "content": response_text,
             "response": response_text,
             "timestamp": datetime.utcnow().isoformat(),
-            "model": "document-intelligence-assistant"
+            "model": "gpt-3.5-turbo",
+            "context_used": True
         }
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")

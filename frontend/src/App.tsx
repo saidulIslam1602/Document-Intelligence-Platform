@@ -22,6 +22,7 @@ const MCPTools = lazy(() => import('./pages/MCPTools'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const ProcessingPipeline = lazy(() => import('./pages/ProcessingPipeline'));
 const Webhooks = lazy(() => import('./pages/Webhooks'));
+const About = lazy(() => import('./pages/About'));
 
 function App() {
   const [isAuth, setIsAuth] = useState(!!localStorage.getItem('token'));
@@ -41,6 +42,7 @@ function App() {
               <Route path="entities" element={<Entities />} />
               <Route path="chat" element={<Chat />} />
               <Route path="search" element={<Search />} />
+              <Route path="about" element={<About />} />
               <Route path="settings" element={<Settings />} />
               
               {/* Admin/Developer only routes */}
