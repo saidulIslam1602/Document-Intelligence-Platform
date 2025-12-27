@@ -15,6 +15,12 @@ export default function Login({ setAuth }: { setAuth: (val: boolean) => void }) 
     try {
       const res = await api.post('/auth/login', { email, password });
       localStorage.setItem('token', res.data.access_token);
+      
+      // Store user data in localStorage for immediate access
+      if (res.data.user) {
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+      }
+      
       setAuth(true);
       
       // Role-based redirect

@@ -3,7 +3,11 @@ import authService from '../services/auth.service';
 import { User } from '../types';
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    // Initialize user from localStorage if available
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,6 +20,7 @@ export function useAuth() {
       try {
         const userData = await authService.getCurrentUser();
         setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
       } catch (err) {
         setError('Failed to authenticate');
         logout();
@@ -38,6 +43,7 @@ export function useAuth() {
 
   const logout = async () => {
     await authService.logout();
+    localStorage.removeItem('user');
     setUser(null);
   };
 
