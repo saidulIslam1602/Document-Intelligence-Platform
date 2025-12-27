@@ -573,7 +573,9 @@ from src.shared.storage.sql_service import SQLService
 from src.shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
 from src.shared.monitoring.performance_monitor import monitor_performance
 from src.shared.storage.local_storage import LocalStorageService
-from src.shared.storage.database_service import PostgresDatabase
+import psycopg2
+import psycopg2.extras
+import os
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -602,13 +604,25 @@ logger = logging.getLogger(__name__)
 # Initialize local storage
 local_storage_service = LocalStorageService()
 
-# Initialize PostgreSQL database
+# Initialize PostgreSQL database connection
 try:
-    db = PostgresDatabase()
+    DB_HOST = os.getenv("POSTGRES_HOST", "docintel-postgres")
+    DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+    DB_NAME = os.getenv("POSTGRES_DB", "documentintelligence")
+    DB_USER = os.getenv("POSTGRES_USER", "admin")
+    DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "admin123")
+    
+    db_connection = psycopg2.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD
+    )
     DATABASE_AVAILABLE = True
-    logger.info("PostgreSQL database initialized successfully")
+    logger.info(f"PostgreSQL database connected: {DB_HOST}:{DB_PORT}/{DB_NAME}")
 except Exception as e:
-    db = None
+    db_connection = None
     DATABASE_AVAILABLE = False
     logger.warning(f"PostgreSQL not available: {e}")
 
@@ -1149,17 +1163,16 @@ async def delete_document(
         user_id = request.headers.get("X-User-ID", "demo1234")
         logger.info(f"Deleting document {document_id} for user {user_id}")
         
-        if DATABASE_AVAILABLE:
+        if DATABASE_AVAILABLE and db_connection:
             # Delete from PostgreSQL
-            conn = db.get_connection()
-            cursor = conn.cursor()
+            cursor = db_connection.cursor()
             
             # Delete related data first
             cursor.execute("DELETE FROM document_entities WHERE document_id = %s", (document_id,))
             cursor.execute("DELETE FROM invoice_extractions WHERE document_id = %s", (document_id,))
             cursor.execute("DELETE FROM documents WHERE id = %s", (document_id,))
             
-            conn.commit()
+            db_connection.commit()
             cursor.close()
             
             logger.info(f"Document {document_id} deleted from PostgreSQL")
