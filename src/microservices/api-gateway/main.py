@@ -732,19 +732,19 @@ else:
 
 # Service endpoints
 SERVICE_ENDPOINTS = {
-    "document-ingestion": "http://document-ingestion:8000",
-    "ai-processing": "http://ai-processing:8001",
-    "analytics": "http://analytics:8002",
-    "user-management": "http://user-management:8003",
-    "ai-chat": "http://ai-chat:8004",
-    "performance-dashboard": "http://performance-dashboard:8005",
-    "data-quality": "http://data-quality:8006",
-    "batch-processor": "http://batch-processor:8007",
-    "data-catalog": "http://data-catalog:8008",
-    "migration-service": "http://migration-service:8009",
-    "fabric-integration": "http://fabric-integration:8010",
-    "demo-service": "http://demo-service:8011",
-    "mcp-server": "http://mcp-server:8012"
+    "document-ingestion": "http://localhost:8000",
+    "ai-processing": "http://localhost:8001",
+    "analytics": "http://localhost:8002",
+    "user-management": "http://localhost:8003",
+    "ai-chat": "http://localhost:8004",
+    "performance-dashboard": "http://localhost:8005",
+    "data-quality": "http://localhost:8006",
+    "batch-processor": "http://localhost:8007",
+    "data-catalog": "http://localhost:8008",
+    "migration-service": "http://localhost:8009",
+    "fabric-integration": "http://localhost:8010",
+    "demo-service": "http://localhost:8011",
+    "mcp-server": "http://localhost:8012"
 }
 
 # Rate limiting configuration
