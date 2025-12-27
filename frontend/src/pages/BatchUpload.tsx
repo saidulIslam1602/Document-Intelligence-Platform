@@ -115,7 +115,7 @@ export default function BatchUpload() {
                 multiple
                 onChange={handleFileSelect}
                 className="hidden"
-                accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+                accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.tiff,.tif"
                 disabled={uploading}
               />
             </label>
@@ -135,7 +135,7 @@ export default function BatchUpload() {
           </div>
 
           <p className="text-sm text-gray-500">
-            Select up to 100 files (max 20MB each). Supported: PDF, DOC, DOCX, TXT, PNG, JPG
+            Select up to 100 files (max 20MB each). Supported: PDF, DOC, DOCX, TXT, PNG, JPG, JPEG, TIFF
           </p>
         </div>
       </Card>

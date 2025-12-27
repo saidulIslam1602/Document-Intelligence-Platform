@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
+import documentsService from '../services/documents.service';
 import { Document } from '../types';
 import DocumentUpload from '../components/documents/DocumentUpload';
 import DocumentCard from '../components/documents/DocumentCard';
@@ -7,6 +8,13 @@ import SearchBar from '../components/common/SearchBar';
 import Modal from '../components/common/Modal';
 import DocumentViewer from '../components/documents/DocumentViewer';
 import Button from '../components/common/Button';
+
+interface UploadProgress {
+  file: string;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  progress: number;
+  error?: string;
+}
 
 export default function Documents() {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -17,6 +25,8 @@ export default function Documents() {
   const [showUpload, setShowUpload] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   useEffect(() => {
     loadDocuments();
@@ -40,23 +50,77 @@ export default function Documents() {
     }
   };
 
-  const handleUpload = async (files: FileList) => {
+  const handleFilesSelected = (files: FileList) => {
+    const fileArray = Array.from(files);
+    setSelectedFiles(fileArray);
+    
+    // Initialize upload progress
+    const progress: UploadProgress[] = fileArray.map(file => ({
+      file: file.name,
+      status: 'pending',
+      progress: 0,
+    }));
+    setUploadProgress(progress);
+  };
+
+  const startUpload = async () => {
+    if (selectedFiles.length === 0) return;
+    
     setUploading(true);
     
-    for (let i = 0; i < files.length; i++) {
-      const formData = new FormData();
-      formData.append('file', files[i]);
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      
+      // Update status to uploading
+      setUploadProgress(prev => prev.map((item, idx) => 
+        idx === i ? { ...item, status: 'uploading', progress: 0 } : item
+      ));
 
       try {
-        await api.post('/documents/upload', formData);
-      } catch (error) {
-        console.error(`Failed to upload ${files[i].name}`);
+        // Upload with real progress tracking
+        await documentsService.upload(file, (progress) => {
+          setUploadProgress(prev => prev.map((item, idx) => 
+            idx === i ? { ...item, progress: Math.round(progress) } : item
+          ));
+        });
+        
+        // Mark as success
+        setUploadProgress(prev => prev.map((item, idx) => 
+          idx === i ? { ...item, status: 'success', progress: 100 } : item
+        ));
+      } catch (error: any) {
+        // Mark as error
+        setUploadProgress(prev => prev.map((item, idx) => 
+          idx === i ? { 
+            ...item, 
+            status: 'error', 
+            progress: 0,
+            error: error.response?.data?.detail || 'Upload failed'
+          } : item
+        ));
       }
     }
     
     setUploading(false);
+    
+    // Wait a moment to show final status
+    setTimeout(() => {
+      // Check if we should auto-close
+      const hasErrors = uploadProgress.some(item => item.status === 'error');
+      if (!hasErrors) {
+        setShowUpload(false);
+        setSelectedFiles([]);
+        setUploadProgress([]);
+        loadDocuments();
+      }
+    }, 1500);
+  };
+
+  const cancelUpload = () => {
     setShowUpload(false);
-    loadDocuments();
+    setSelectedFiles([]);
+    setUploadProgress([]);
+    setUploading(false);
   };
 
   const viewDocument = async (docId: string) => {
@@ -165,9 +229,86 @@ export default function Documents() {
         </>
       )}
 
-      <Modal isOpen={showUpload} onClose={() => setShowUpload(false)} title="Upload Documents">
-        <DocumentUpload onUpload={handleUpload} />
-        {uploading && <p className="mt-4 text-center">Uploading...</p>}
+      <Modal isOpen={showUpload} onClose={cancelUpload} title="Upload Documents">
+        {selectedFiles.length === 0 ? (
+          <DocumentUpload onUpload={handleFilesSelected} />
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-blue-900">
+                {selectedFiles.length} file(s) selected
+              </p>
+            </div>
+            
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {uploadProgress.map((progress, idx) => (
+                <div key={idx} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium truncate flex-1 mr-4">
+                      {progress.file}
+                    </span>
+                    {progress.status === 'success' && (
+                      <span className="text-green-600 font-medium">✓ Done</span>
+                    )}
+                    {progress.status === 'error' && (
+                      <span className="text-red-600 font-medium">✗ Failed</span>
+                    )}
+                    {progress.status === 'uploading' && (
+                      <span className="text-blue-600 font-medium">Uploading...</span>
+                    )}
+                    {progress.status === 'pending' && (
+                      <span className="text-gray-500 font-medium">Pending</span>
+                    )}
+                  </div>
+                  
+                  {/* Progress bar */}
+                  {(progress.status === 'uploading' || progress.status === 'success') && (
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          progress.status === 'success' ? 'bg-green-600' : 'bg-blue-600'
+                        }`}
+                        style={{ width: `${progress.progress}%` }}
+                      ></div>
+                    </div>
+                  )}
+                  
+                  {/* Error message */}
+                  {progress.status === 'error' && progress.error && (
+                    <p className="text-xs text-red-600 mt-1">{progress.error}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                onClick={startUpload}
+                disabled={uploading}
+                className="flex-1"
+              >
+                {uploading ? 'Uploading...' : 'Start Upload'}
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedFiles([]);
+                  setUploadProgress([]);
+                }}
+                variant="secondary"
+                disabled={uploading}
+              >
+                Clear
+              </Button>
+              <Button
+                onClick={cancelUpload}
+                variant="secondary"
+                disabled={uploading}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal 
