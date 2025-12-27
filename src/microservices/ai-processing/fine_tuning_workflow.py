@@ -13,7 +13,7 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 
-from .fine_tuning_service import DocumentFineTuningService, FineTuningStatus, FineTuningJob
+from fine_tuning_service import DocumentFineTuningService, FineTuningStatus, FineTuningJob
 from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus
 from src.shared.storage.sql_service import SQLService
 from src.shared.config.settings import config_manager

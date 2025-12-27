@@ -427,6 +427,7 @@ Module: Health Monitoring and Service Observability
 """
 
 import asyncio
+import os
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -597,37 +598,98 @@ class DatabaseDependencyCheck(DependencyCheck):
         super().__init__(name, critical)
     
     async def check(self) -> Dict[str, Any]:
-        """Check database health"""
+        """Check database health (PostgreSQL or SQL Server)"""
         start_time = datetime.now()
         settings = get_settings()
         
         try:
-            import pyodbc
+            # Try PostgreSQL first (for local development)
+            postgres_host = os.getenv('POSTGRES_HOST', '')
+            postgres_port = os.getenv('POSTGRES_PORT', '5432')
+            postgres_db = os.getenv('POSTGRES_DB', '')
+            postgres_user = os.getenv('POSTGRES_USER', '')
+            postgres_password = os.getenv('POSTGRES_PASSWORD', '')
             
-            # Use asyncio to run blocking ODBC call
-            def check_db():
-                conn = pyodbc.connect(
-                    settings.database.connection_string,
-                    timeout=5
-                )
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
-                cursor.close()
-                conn.close()
-            
-            await asyncio.to_thread(check_db)
-            
-            response_time = (datetime.now() - start_time).total_seconds() * 1000
-            
-            return {
-                "status": HealthStatus.HEALTHY,
-                "response_time_ms": round(response_time, 2),
-                "message": f"{self.name} is healthy",
-                "details": {
-                    "server": settings.database.server_name or "configured",
-                    "database": settings.database.database_name or "configured"
+            if postgres_host and postgres_db:
+                # Use PostgreSQL
+                try:
+                    import psycopg2
+                except ImportError:
+                    response_time = (datetime.now() - start_time).total_seconds() * 1000
+                    return {
+                        "status": HealthStatus.UNHEALTHY,
+                        "response_time_ms": round(response_time, 2),
+                        "message": f"{self.name} health check failed: psycopg2 not installed",
+                        "details": {"error": "psycopg2 module not found. Install with: pip install psycopg2-binary"}
+                    }
+                
+                def check_pg():
+                    conn = psycopg2.connect(
+                        host=postgres_host,
+                        port=int(postgres_port),
+                        database=postgres_db,
+                        user=postgres_user,
+                        password=postgres_password,
+                        connect_timeout=5
+                    )
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT 1")
+                    cursor.fetchone()
+                    cursor.close()
+                    conn.close()
+                
+                await asyncio.to_thread(check_pg)
+                
+                response_time = (datetime.now() - start_time).total_seconds() * 1000
+                
+                return {
+                    "status": HealthStatus.HEALTHY,
+                    "response_time_ms": round(response_time, 2),
+                    "message": f"{self.name} is healthy (PostgreSQL)",
+                    "details": {
+                        "database": postgres_db,
+                        "host": postgres_host,
+                        "type": "postgresql"
+                    }
                 }
+            
+            # Fall back to Azure SQL (pyodbc)
+            if settings.database.connection_string:
+                import pyodbc
+                
+                def check_db():
+                    conn = pyodbc.connect(
+                        settings.database.connection_string,
+                        timeout=5
+                    )
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT 1")
+                    cursor.fetchone()
+                    cursor.close()
+                    conn.close()
+                
+                await asyncio.to_thread(check_db)
+                
+                response_time = (datetime.now() - start_time).total_seconds() * 1000
+                
+                return {
+                    "status": HealthStatus.HEALTHY,
+                    "response_time_ms": round(response_time, 2),
+                    "message": f"{self.name} is healthy (SQL Server)",
+                    "details": {
+                        "server": settings.database.server_name or "configured",
+                        "database": settings.database.database_name or "configured",
+                        "type": "sqlserver"
+                    }
+                }
+            
+            # No database configured
+            response_time = (datetime.now() - start_time).total_seconds() * 1000
+            return {
+                "status": HealthStatus.UNHEALTHY,
+                "response_time_ms": round(response_time, 2),
+                "message": f"{self.name} not configured",
+                "details": {"error": "Neither PostgreSQL nor SQL Server configured"}
             }
             
         except Exception as e:

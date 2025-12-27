@@ -331,3 +331,70 @@ class CostTracker:
 
 
 cost_tracker = CostTracker()
+
+
+# Performance monitor class with endpoint monitoring
+class PerformanceMonitor:
+    """
+    Performance monitoring class with endpoint-specific monitoring
+    
+    Usage:
+        @performance_monitor.monitor_endpoint
+        async def my_endpoint():
+            pass
+    """
+    
+    def __init__(self):
+        self.metrics = metrics
+        self.logger = logger
+    
+    def monitor_endpoint(self, func):
+        """
+        Decorator to monitor endpoint performance
+        """
+        import asyncio
+        from functools import wraps
+        
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            start_time = time.time()
+            try:
+                result = await func(*args, **kwargs)
+                latency = time.time() - start_time
+                
+                if latency > 1.0:
+                    self.logger.warning(
+                        f"Slow endpoint: {func.__name__} took {latency:.2f}s"
+                    )
+                
+                return result
+            except Exception as e:
+                latency = time.time() - start_time
+                self.logger.error(f"Endpoint {func.__name__} failed after {latency:.2f}s: {str(e)}")
+                raise
+        
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            start_time = time.time()
+            try:
+                result = func(*args, **kwargs)
+                latency = time.time() - start_time
+                
+                if latency > 1.0:
+                    self.logger.warning(
+                        f"Slow endpoint: {func.__name__} took {latency:.2f}s"
+                    )
+                
+                return result
+            except Exception as e:
+                latency = time.time() - start_time
+                self.logger.error(f"Endpoint {func.__name__} failed after {latency:.2f}s: {str(e)}")
+                raise
+        
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        return sync_wrapper
+
+
+# Global performance monitor instance
+performance_monitor = PerformanceMonitor()

@@ -79,10 +79,11 @@ class AdvancedMonitoringService:
         # Monitoring clients
         self.metrics_client = MetricsQueryClient(self.credential)
         self.logs_client = LogsQueryClient(self.credential)
-        self.monitor_client = # MonitorManagementClient(
-            self.credential,
-            self.config.subscription_id
-        )
+        # self.monitor_client = MonitorManagementClient(
+        #     self.credential,
+        #     self.config.subscription_id
+        # )
+        self.monitor_client = None  # Disabled for compatibility
         
         # Workspace ID for Log Analytics
         self.workspace_id = self.config.log_analytics_workspace_id

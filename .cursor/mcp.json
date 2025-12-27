@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "document-intelligence": {
+      "command": "node",
+      "args": [],
+      "env": {},
+      "serverInfo": {
+        "name": "Document Intelligence Platform",
+        "version": "2.0.0"
+      },
+      "transportType": "http",
+      "url": "http://localhost:8012",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiY3Vyc29yX3VzZXIiLCJyb2xlIjoiZGV2ZWxvcGVyIiwibWV0YWRhdGEiOnsic291cmNlIjoiY3Vyc29yX2lkZSJ9LCJleHAiOjE3NjY5MjYyNjMsImlhdCI6MTc2NjgzOTg2M30.5rLVMmNnIqyAajEo8j53onGXTNZKBsi2QjhfDpY4YYM"
+      }
+    }
+  }
+}

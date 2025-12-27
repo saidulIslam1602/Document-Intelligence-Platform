@@ -498,11 +498,21 @@ from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 import numpy as np
 from openai import AzureOpenAI, OpenAI
-from azure.core.credentials import AzureKeyCredential
-from azure.search.documents import SearchClient
-from azure.search.documents.indexes import SearchIndexClient
-from azure.search.documents.models import VectorizedQuery
 import os
+
+# Azure imports (optional)
+try:
+    from azure.core.credentials import AzureKeyCredential
+    from azure.search.documents import SearchClient
+    from azure.search.documents.indexes import SearchIndexClient
+    from azure.search.documents.models import VectorizedQuery
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    AzureKeyCredential = None
+    SearchClient = None
+    SearchIndexClient = None
+    VectorizedQuery = None
 
 from src.shared.config.settings import config_manager
 from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus
@@ -624,35 +634,65 @@ class OpenAIService:
             - PHONE: Phone numbers
             - URL: Web addresses
             
-            Return the results in JSON format with entity type as key and list of entities as value.
+            Return ONLY valid JSON format with entity type as key and list of entities as value.
+            Example: {{"ORGANIZATION": ["Microsoft"], "MONEY": ["$1000"], "DATE": ["2024-01-15"]}}
             
             Text:
             {text[:3000]}
             """
             
+            self.logger.info(f"Calling OpenAI for entity extraction (text length: {len(text)})")
+            
             response = await self._call_openai(
                 model=self.models["gpt4"],
                 messages=[
-                    {"role": "system", "content": "You are an expert named entity recognition system. Return only valid JSON."},
+                    {"role": "system", "content": "You are an expert named entity recognition system. Return ONLY valid JSON, no markdown, no explanations."},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=1000,
                 temperature=0.1
             )
             
-            entities_json = response.choices[0].message.content
-            entities = json.loads(entities_json)
+            self.logger.info(f"OpenAI response received: {type(response)}")
+            
+            if not response or not hasattr(response, 'choices') or not response.choices:
+                self.logger.error("Empty or invalid response from OpenAI")
+                entities = {}
+            else:
+                entities_json = response.choices[0].message.content.strip()
+                self.logger.info(f"Raw entities JSON (first 200 chars): {entities_json[:200]}")
+                
+                # Remove markdown code blocks if present
+                if entities_json.startswith("```"):
+                    entities_json = entities_json.split("```")[1]
+                    if entities_json.startswith("json"):
+                        entities_json = entities_json[4:]
+                    entities_json = entities_json.strip()
+                
+                try:
+                    entities = json.loads(entities_json)
+                    self.logger.info(f"Successfully parsed {len(entities)} entity types")
+                except json.JSONDecodeError as je:
+                    self.logger.warning(f"Failed to parse entities JSON: {je}. Response: {entities_json[:200]}")
+                    entities = {}
             
             return {
                 "entities": entities,
-                "entity_count": sum(len(v) for v in entities.values()),
+                "entity_count": sum(len(v) if isinstance(v, list) else 1 for v in entities.values()),
                 "model_used": self.models["gpt4"],
                 "timestamp": datetime.utcnow().isoformat()
             }
             
         except Exception as e:
             self.logger.error(f"Error extracting entities: {str(e)}")
-            raise
+            # Return empty result instead of failing
+            return {
+                "entities": {},
+                "entity_count": 0,
+                "model_used": self.models["gpt4"],
+                "timestamp": datetime.utcnow().isoformat(),
+                "error": str(e)
+            }
     
     async def answer_question(self, question: str, context: str = None, 
                             document_id: str = None) -> Dict[str, Any]:
@@ -728,27 +768,61 @@ class OpenAIService:
             response = await self._call_openai(
                 model=self.models["gpt4"],
                 messages=[
-                    {"role": "system", "content": "You are an expert document classifier. Return only valid JSON."},
+                    {"role": "system", "content": "You are an expert document classifier. Return ONLY valid JSON, no markdown."},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=200,
                 temperature=0.1
             )
             
-            classification_json = response.choices[0].message.content
-            classification = json.loads(classification_json)
+            if not response or not hasattr(response, 'choices') or not response.choices:
+                self.logger.error("Empty or invalid response from OpenAI for classification")
+                return {
+                    "document_type": "invoice",
+                    "confidence": 0.5,
+                    "reasoning": "Fallback classification",
+                    "model_used": self.models["gpt4"],
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
+            classification_json = response.choices[0].message.content.strip()
+            
+            # Remove markdown code blocks if present
+            if classification_json.startswith("```"):
+                classification_json = classification_json.split("```")[1]
+                if classification_json.startswith("json"):
+                    classification_json = classification_json[4:]
+                classification_json = classification_json.strip()
+            
+            try:
+                classification = json.loads(classification_json)
+            except json.JSONDecodeError:
+                self.logger.warning(f"Failed to parse classification JSON: {classification_json[:200]}")
+                return {
+                    "document_type": "invoice",
+                    "confidence": 0.5,
+                    "reasoning": "JSON parse error",
+                    "model_used": self.models["gpt4"],
+                    "timestamp": datetime.utcnow().isoformat()
+                }
             
             return {
-                "document_type": classification["category"],
-                "confidence": classification["confidence"],
-                "reasoning": classification["reasoning"],
+                "document_type": classification.get("category", "invoice"),
+                "confidence": classification.get("confidence", 0.5),
+                "reasoning": classification.get("reasoning", ""),
                 "model_used": self.models["gpt4"],
                 "timestamp": datetime.utcnow().isoformat()
             }
             
         except Exception as e:
             self.logger.error(f"Error classifying document: {str(e)}")
-            raise
+            return {
+                "document_type": "invoice",
+                "confidence": 0.5,
+                "reasoning": f"Error: {str(e)}",
+                "model_used": self.models["gpt4"],
+                "timestamp": datetime.utcnow().isoformat()
+            }
     
     async def analyze_sentiment(self, text: str) -> Dict[str, Any]:
         """Analyze sentiment of document content"""

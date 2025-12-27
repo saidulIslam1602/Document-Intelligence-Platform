@@ -10,7 +10,7 @@ from typing import Dict, Any
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.routing import APIRouter
 
-from .fine_tuning_dashboard import FineTuningDashboard
+from fine_tuning_dashboard import FineTuningDashboard
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

@@ -2,12 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (including PostgreSQL client libraries)
 RUN apt-get update && apt-get install -y \
     gcc \
-    unixodbc-dev \
     g++ \
     curl \
+    unixodbc-dev \
+    libpq-dev \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install dependencies

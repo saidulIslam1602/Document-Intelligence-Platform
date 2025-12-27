@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 from enum import Enum
 
-from .fine_tuning_service import DocumentFineTuningService, FineTuningStatus, FineTuningMethod
+from fine_tuning_service import DocumentFineTuningService, FineTuningStatus, FineTuningMethod
 from src.shared.auth.auth_service import AuthService
 from src.shared.monitoring.performance_monitor import performance_monitor
 

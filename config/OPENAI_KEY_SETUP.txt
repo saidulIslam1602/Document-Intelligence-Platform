@@ -33,8 +33,8 @@ For production or real AI capabilities:
      USE_MOCK_SERVICES=false
 
 3. Restart services:
-   ./scripts/stop_local.sh
-   ./scripts/run_local.sh
+   ./stop.sh
+   ./start.sh
 
 
 OPTION 3: Use Azure OpenAI

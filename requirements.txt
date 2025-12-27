@@ -1,3 +1,4 @@
+# Core Web Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
@@ -6,21 +7,7 @@ python-multipart==0.0.6
 httpx==0.25.1
 aiofiles==23.2.1
 
-# Azure SDK
-azure-storage-blob==12.19.0
-azure-storage-file-datalake==12.13.1
-azure-ai-formrecognizer==3.3.1
-azure-ai-textanalytics==5.3.0
-azure-cosmos==4.5.1
-azure-servicebus==7.11.4
-azure-eventhub==5.11.5
-azure-keyvault-secrets==4.7.0
-azure-identity==1.15.0
-azure-monitor-query==1.2.0
-azure-search-documents==11.4.0
-
 # OpenAI
-# Note: Updated to 1.6.1+ to satisfy langchain-openai>=1.6.1 requirement
 openai==1.7.2
 
 # LangChain for orchestration
@@ -28,57 +15,35 @@ langchain==0.1.0
 langchain-openai==0.0.2
 langchain-community==0.0.10
 
-# MCP (Model Context Protocol)
-# Note: MCP is a specification, implemented in code - no package needed
-
 # Database
+psycopg2-binary==2.9.9
 pyodbc==5.0.1
 sqlalchemy==2.0.23
 redis==5.0.1
 
-# Data Processing
-pandas==2.1.3
-numpy==1.26.2
-scikit-learn==1.3.2
-
-# ML & NLP
-transformers==4.35.2
-torch==2.1.1
-spacy==3.7.2
-
-# Visualization
-plotly==5.18.0
-matplotlib==3.8.2
-
-# Monitoring & Logging
-prometheus-client==0.19.0
-opencensus-ext-azure==1.1.11
-python-json-logger==2.0.7
+# Minimal Azure (for compatibility only, not used in local mode)
+azure-core==1.29.5
+azure-identity==1.15.0
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
 PyJWT==2.8.0
+
+# Monitoring & Logging (lightweight)
+prometheus-client==0.19.0
+python-json-logger==2.0.7
+
+# Data Processing (minimal)
+pandas==2.1.3
+numpy==1.26.2
 
 # Utilities
 python-dotenv==1.0.0
 requests==2.31.0
 pyyaml==6.0.1
+psutil==5.9.6
 
-# Testing
+# Testing (optional, can comment out if needed)
 pytest==7.4.3
 pytest-asyncio==0.21.1
-pytest-cov==4.1.0
-faker==20.1.0
-
-# Documentation
-# Note: Package is 'markdown' not 'python-markdown'
-markdown==3.5.1
-
-# Power BI
-# Note: Using msal for Power BI authentication instead of powerbiclient
-msal==1.24.0
-
-# Performance
-psutil==5.9.6

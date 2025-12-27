@@ -1,0 +1,16 @@
+{
+  "receipt_id": "REC-2024-001",
+  "merchant": "Local Store",
+  "date": "2024-01-20",
+  "total": 125.5,
+  "items": [
+    {
+      "item": "Office Supplies",
+      "price": 45.99
+    },
+    {
+      "item": "Equipment",
+      "price": 79.51
+    }
+  ]
+}

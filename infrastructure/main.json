@@ -1,0 +1,1259 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.39.26.7824",
+      "templateHash": "14945240725937063698"
+    }
+  },
+  "parameters": {
+    "resourceGroupName": {
+      "type": "string",
+      "defaultValue": "document-intelligence-rg",
+      "metadata": {
+        "description": "The name of the resource group"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "westus2",
+      "metadata": {
+        "description": "The location for all resources"
+      }
+    },
+    "environment": {
+      "type": "string",
+      "defaultValue": "dev",
+      "allowedValues": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment name (dev, staging, prod)"
+      }
+    },
+    "appNamePrefix": {
+      "type": "string",
+      "defaultValue": "docintel",
+      "metadata": {
+        "description": "Application name prefix"
+      }
+    },
+    "openaiDeploymentName": {
+      "type": "string",
+      "defaultValue": "gpt-4",
+      "metadata": {
+        "description": "Azure OpenAI deployment name"
+      }
+    },
+    "enablePublicAccess": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable public access for development"
+      }
+    }
+  },
+  "variables": {
+    "resourcePrefix": "[format('{0}-{1}', parameters('appNamePrefix'), parameters('environment'))]",
+    "uniqueSuffix": "[substring(uniqueString(resourceGroup().id), 0, 6)]",
+    "storagePrefix": "[format('{0}{1}{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+    "tags": {
+      "Environment": "[parameters('environment')]",
+      "Application": "Document Intelligence Platform",
+      "ManagedBy": "Bicep",
+      "CostCenter": "Engineering"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}st', variables('storagePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "allowBlobPublicAccess": false,
+        "minimumTlsVersion": "TLS1_2",
+        "supportsHttpsTrafficOnly": true,
+        "networkAcls": {
+          "defaultAction": "[if(parameters('enablePublicAccess'), 'Allow', 'Deny')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}', format('{0}st', variables('storagePrefix')), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', format('{0}st', variables('storagePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', format('{0}st', variables('storagePrefix')), 'default', 'documents')]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', format('{0}st', variables('storagePrefix')), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', format('{0}st', variables('storagePrefix')), 'default', 'checkpoints')]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', format('{0}st', variables('storagePrefix')), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Sql/servers",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}sql{1}', variables('resourcePrefix'), uniqueString(resourceGroup().id))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "administratorLogin": "sqladmin",
+        "administratorLoginPassword": "TempPassword123!",
+        "version": "12.0",
+        "minimalTlsVersion": "1.2",
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}sql{1}', variables('resourcePrefix'), uniqueString(resourceGroup().id)), 'documentintelligence')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "[if(equals(parameters('environment'), 'dev'), 'Basic', 'S2')]",
+        "tier": "[if(equals(parameters('environment'), 'dev'), 'Basic', 'Standard')]"
+      },
+      "properties": {
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "maxSizeBytes": "[if(equals(parameters('environment'), 'dev'), json('2147483648'), json('107374182400'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', format('{0}sql{1}', variables('resourcePrefix'), uniqueString(resourceGroup().id)))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}sql{1}', variables('resourcePrefix'), uniqueString(resourceGroup().id)), 'AllowAzureServices')]",
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', format('{0}sql{1}', variables('resourcePrefix'), uniqueString(resourceGroup().id)))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}dl', variables('storagePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "allowBlobPublicAccess": false,
+        "minimumTlsVersion": "TLS1_2",
+        "supportsHttpsTrafficOnly": true,
+        "isHnsEnabled": true,
+        "networkAcls": {
+          "defaultAction": "[if(parameters('enablePublicAccess'), 'Allow', 'Deny')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}', format('{0}dl', variables('storagePrefix')), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', format('{0}dl', variables('storagePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', format('{0}dl', variables('storagePrefix')), 'default', 'raw-data')]",
+      "properties": {
+        "publicAccess": "None",
+        "metadata": {
+          "purpose": "Raw data ingestion"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', format('{0}dl', variables('storagePrefix')), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', format('{0}dl', variables('storagePrefix')), 'default', 'processed-data')]",
+      "properties": {
+        "publicAccess": "None",
+        "metadata": {
+          "purpose": "Processed and transformed data"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', format('{0}dl', variables('storagePrefix')), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', format('{0}dl', variables('storagePrefix')), 'default', 'analytics-data')]",
+      "properties": {
+        "publicAccess": "None",
+        "metadata": {
+          "purpose": "Analytics and ML training data"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', format('{0}dl', variables('storagePrefix')), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', format('{0}dl', variables('storagePrefix')), 'default', 'data-warehouse')]",
+      "properties": {
+        "publicAccess": "None",
+        "metadata": {
+          "purpose": "Data warehouse storage"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', format('{0}dl', variables('storagePrefix')), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.EventHub/namespaces",
+      "apiVersion": "2023-01-01-preview",
+      "name": "[format('{0}-eventhub', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Standard",
+        "capacity": 1
+      },
+      "properties": {
+        "minimumTlsVersion": "1.2",
+        "publicNetworkAccess": "Enabled",
+        "disableLocalAuth": false,
+        "zoneRedundant": false
+      }
+    },
+    {
+      "type": "Microsoft.EventHub/namespaces/eventhubs",
+      "apiVersion": "2023-01-01-preview",
+      "name": "[format('{0}/{1}', format('{0}-eventhub', variables('resourcePrefix')), 'document-processing')]",
+      "properties": {
+        "messageRetentionInDays": 7,
+        "partitionCount": 4,
+        "status": "Active"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.EventHub/namespaces', format('{0}-eventhub', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces",
+      "apiVersion": "2022-10-01-preview",
+      "name": "[format('{0}-servicebus', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Standard"
+      },
+      "properties": {
+        "minimumTlsVersion": "1.2",
+        "publicNetworkAccess": "Enabled",
+        "disableLocalAuth": false
+      }
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces/queues",
+      "apiVersion": "2022-10-01-preview",
+      "name": "[format('{0}/{1}', format('{0}-servicebus', variables('resourcePrefix')), 'document-processing')]",
+      "properties": {
+        "maxSizeInMegabytes": 1024,
+        "defaultMessageTimeToLive": "P14D",
+        "lockDuration": "PT5M",
+        "deadLetteringOnMessageExpiration": true,
+        "enableBatchedOperations": true
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces', format('{0}-servicebus', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces/queues",
+      "apiVersion": "2022-10-01-preview",
+      "name": "[format('{0}/{1}', format('{0}-servicebus', variables('resourcePrefix')), 'batch-processing')]",
+      "properties": {
+        "maxSizeInMegabytes": 1024,
+        "defaultMessageTimeToLive": "P14D",
+        "lockDuration": "PT5M",
+        "deadLetteringOnMessageExpiration": true,
+        "enableBatchedOperations": true
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces', format('{0}-servicebus', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}-apim', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "[if(equals(parameters('environment'), 'dev'), 'Developer', 'Standard')]",
+        "capacity": "[if(equals(parameters('environment'), 'dev'), 1, 2)]"
+      },
+      "properties": {
+        "publisherName": "Document Intelligence Platform",
+        "publisherEmail": "admin@documentintelligence.com",
+        "notificationSenderEmail": "noreply@documentintelligence.com",
+        "publicNetworkAccess": "Enabled",
+        "virtualNetworkType": "None",
+        "disableGateway": false,
+        "additionalLocations": [],
+        "customProperties": {
+          "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10": "false",
+          "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11": "false",
+          "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30": "false",
+          "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Ciphers.TripleDes168": "false",
+          "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10": "false",
+          "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11": "false",
+          "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30": "false"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-api')]",
+      "properties": {
+        "displayName": "Document Intelligence API",
+        "description": "API for Document Intelligence Platform",
+        "serviceUrl": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-api-gateway', variables('resourcePrefix'))), '2023-05-01').configuration.ingress.fqdn)]",
+        "path": "api",
+        "protocols": [
+          "https"
+        ],
+        "subscriptionRequired": true,
+        "apiVersion": "v1",
+        "apiVersionSetId": "[format('{0}/apiVersionSets/document-intelligence-versions', resourceId('Microsoft.ApiManagement/service', format('{0}-apim', variables('resourcePrefix'))))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/containerApps', format('{0}-api-gateway', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.ApiManagement/service', format('{0}-apim', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apiVersionSets",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-versions')]",
+      "properties": {
+        "displayName": "Document Intelligence API Versions",
+        "versioningScheme": "Segment",
+        "description": "Version set for Document Intelligence API"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', format('{0}-apim', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}/{2}', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-api', 'upload-document')]",
+      "properties": {
+        "displayName": "Upload Document",
+        "method": "POST",
+        "urlTemplate": "/documents/upload",
+        "description": "Upload a document for processing",
+        "templateParameters": [],
+        "request": {
+          "description": "Document upload request",
+          "queryParameters": [],
+          "headers": [],
+          "representations": [
+            {
+              "contentType": "multipart/form-data",
+              "schemaId": "document-upload-schema",
+              "typeName": "DocumentUpload"
+            }
+          ]
+        },
+        "responses": [
+          {
+            "statusCode": 200,
+            "description": "Document uploaded successfully",
+            "representations": [
+              {
+                "contentType": "application/json",
+                "schemaId": "document-upload-response-schema",
+                "typeName": "DocumentUploadResponse"
+              }
+            ]
+          },
+          {
+            "statusCode": 400,
+            "description": "Bad request",
+            "representations": [
+              {
+                "contentType": "application/json",
+                "schemaId": "error-schema",
+                "typeName": "ErrorResponse"
+              }
+            ]
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-api')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/policies",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}/{2}', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-api', 'policy')]",
+      "properties": {
+        "value": "    <policies>\n        <inbound>\n            <!-- Rate limiting -->\n            <rate-limit calls=\"100\" renewal-period=\"60\" />\n            \n            <!-- CORS -->\n            <cors allow-credentials=\"true\">\n                <allowed-origins>\n                    <origin>*</origin>\n                </allowed-origins>\n                <allowed-methods>\n                    <method>GET</method>\n                    <method>POST</method>\n                    <method>PUT</method>\n                    <method>DELETE</method>\n                    <method>OPTIONS</method>\n                </allowed-methods>\n                <allowed-headers>\n                    <header>*</header>\n                </allowed-headers>\n            </cors>\n            \n            <!-- Authentication -->\n            <validate-jwt header-name=\"Authorization\" failed-validation-httpcode=\"401\" failed-validation-error-message=\"Unauthorized\">\n                <openid-config url=\"https://login.microsoftonline.com/${config.tenant_id}/.well-known/openid_configuration\" />\n                <audiences>\n                    <audience>api://document-intelligence</audience>\n                </audiences>\n                <issuers>\n                    <issuer>https://login.microsoftonline.com/${config.tenant_id}/v2.0</issuer>\n                </issuers>\n            </validate-jwt>\n            \n            <!-- Request transformation -->\n            <set-backend-service base-url=\"https://${apiGatewayApp.properties.configuration.ingress.fqdn}\" />\n            \n            <!-- Logging -->\n            <log-to-eventhub logger-id=\"document-intelligence-logger\">\n                @{\n                    var request = context.Request;\n                    var response = context.Response;\n                    return new JObject(\n                        new JProperty(\"timestamp\", DateTime.UtcNow),\n                        new JProperty(\"requestId\", context.RequestId),\n                        new JProperty(\"method\", request.Method),\n                        new JProperty(\"url\", request.Url.ToString()),\n                        new JProperty(\"statusCode\", response.StatusCode),\n                        new JProperty(\"userId\", context.User?.Identity?.Name ?? \"anonymous\")\n                    ).ToString();\n                }\n            </log-to-eventhub>\n        </inbound>\n        <backend>\n            <forward-request />\n        </backend>\n        <outbound>\n            <!-- Response transformation -->\n            <set-header name=\"X-API-Version\" exists-action=\"override\">\n                <value>v1</value>\n            </set-header>\n            \n            <!-- Caching for GET requests -->\n            <cache-lookup vary-by-developer=\"false\" vary-by-developer-groups=\"false\" />\n            <cache-store duration=\"300\" />\n        </outbound>\n        <on-error>\n            <set-status code=\"500\" reason=\"Internal Server Error\" />\n            <set-header name=\"Content-Type\" exists-action=\"override\">\n                <value>application/json</value>\n            </set-header>\n            <set-body>\n                {\n                    \"error\": \"Internal Server Error\",\n                    \"message\": \"An unexpected error occurred\",\n                    \"requestId\": \"@{context.RequestId}\"\n                }\n            </set-body>\n        </on-error>\n    </policies>\n    "
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-api')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/loggers",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-logger')]",
+      "properties": {
+        "loggerType": "azureEventHub",
+        "description": "Event Hub logger for API Management",
+        "credentials": {
+          "name": "[format('{0}', format('{0}-eventhub', variables('resourcePrefix')))]",
+          "connectionString": "[listKeys(resourceId('Microsoft.EventHub/namespaces', format('{0}-eventhub', variables('resourcePrefix'))), '2023-01-01-preview').primaryConnectionString]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', format('{0}-apim', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.EventHub/namespaces', format('{0}-eventhub', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/products",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-product')]",
+      "properties": {
+        "displayName": "Document Intelligence Platform",
+        "description": "Access to Document Intelligence Platform APIs",
+        "terms": "By using this API, you agree to the terms of service.",
+        "subscriptionRequired": true,
+        "approvalRequired": false,
+        "subscriptionsLimit": 10,
+        "state": "published"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', format('{0}-apim', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/products/apis",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}/{2}', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-product', 'document-intelligence-api')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/products', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-product')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/subscriptions",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-subscription')]",
+      "properties": {
+        "displayName": "Document Intelligence Subscription",
+        "scope": "[format('{0}', resourceId('Microsoft.ApiManagement/service/products', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-product'))]",
+        "state": "active"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', format('{0}-apim', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.ApiManagement/service/products', format('{0}-apim', variables('resourcePrefix')), 'document-intelligence-product')]"
+      ]
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-formrecognizer', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "S0"
+      },
+      "kind": "FormRecognizer",
+      "properties": {
+        "customSubDomainName": "[format('{0}-formrecognizer', variables('resourcePrefix'))]",
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-openai', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "S0"
+      },
+      "kind": "OpenAI",
+      "properties": {
+        "customSubDomainName": "[format('{0}-openai', variables('resourcePrefix'))]",
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Search/searchServices",
+      "apiVersion": "2023-11-01",
+      "name": "[format('{0}-search', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "[if(equals(parameters('environment'), 'dev'), 'free', 'standard')]"
+      },
+      "properties": {
+        "replicaCount": "[if(equals(parameters('environment'), 'dev'), 1, 3)]",
+        "partitionCount": "[if(equals(parameters('environment'), 'dev'), 1, 2)]",
+        "hostingMode": "default",
+        "publicNetworkAccess": "enabled"
+      }
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-container-env', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', variables('resourcePrefix'))), '2023-09-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', variables('resourcePrefix'))), '2023-09-01').primarySharedKey]"
+          }
+        },
+        "vnetConfiguration": {
+          "infrastructureSubnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', format('{0}-vnet', variables('resourcePrefix')), 'default')]",
+          "internal": false
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', format('{0}-vnet', variables('resourcePrefix')), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-document-ingestion', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8000,
+            "allowInsecure": false,
+            "traffic": [
+              {
+                "weight": 100,
+                "latestRevision": true
+              }
+            ]
+          },
+          "registries": [
+            {
+              "server": "[format('{0}{1}acr{2}.azurecr.io', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "username": "[format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))), '2023-07-01').passwords[0].value]"
+            },
+            {
+              "name": "storage-connection-string",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix=core.windows.net', format('{0}st', variables('storagePrefix')), listKeys(resourceId('Microsoft.Storage/storageAccounts', format('{0}st', variables('storagePrefix'))), '2023-01-01').keys[0].value)]"
+            },
+            {
+              "name": "event-hub-connection-string",
+              "value": "[listKeys(resourceId('Microsoft.EventHub/namespaces', format('{0}-eventhub', variables('resourcePrefix'))), '2023-01-01-preview').primaryConnectionString]"
+            },
+            {
+              "name": "service-bus-connection-string",
+              "value": "[listKeys(resourceId('Microsoft.ServiceBus/namespaces', format('{0}-servicebus', variables('resourcePrefix'))), '2022-10-01-preview').primaryConnectionString]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "document-ingestion",
+              "image": "[format('{0}acr.azurecr.io/document-ingestion:latest', variables('resourcePrefix'))]",
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1Gi"
+              },
+              "env": [
+                {
+                  "name": "AZURE_SUBSCRIPTION_ID",
+                  "value": "[subscription().subscriptionId]"
+                },
+                {
+                  "name": "AZURE_RESOURCE_GROUP",
+                  "value": "[resourceGroup().name]"
+                },
+                {
+                  "name": "AZURE_LOCATION",
+                  "value": "[parameters('location')]"
+                },
+                {
+                  "name": "STORAGE_CONNECTION_STRING",
+                  "secretRef": "storage-connection-string"
+                },
+                {
+                  "name": "EVENT_HUB_CONNECTION_STRING",
+                  "secretRef": "event-hub-connection-string"
+                },
+                {
+                  "name": "SERVICE_BUS_CONNECTION_STRING",
+                  "secretRef": "service-bus-connection-string"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": "[if(equals(parameters('environment'), 'dev'), 1, 2)]",
+            "maxReplicas": "[if(equals(parameters('environment'), 'dev'), 3, 10)]",
+            "rules": [
+              {
+                "name": "http-scaling",
+                "http": {
+                  "metadata": {
+                    "concurrentRequests": "30"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.EventHub/namespaces', format('{0}-eventhub', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.ServiceBus/namespaces', format('{0}-servicebus', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', format('{0}st', variables('storagePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-ai-processing', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8001,
+            "allowInsecure": false,
+            "traffic": [
+              {
+                "weight": 100,
+                "latestRevision": true
+              }
+            ]
+          },
+          "registries": [
+            {
+              "server": "[format('{0}{1}acr{2}.azurecr.io', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "username": "[format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))), '2023-07-01').passwords[0].value]"
+            },
+            {
+              "name": "form-recognizer-endpoint",
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-formrecognizer', variables('resourcePrefix'))), '2023-05-01').endpoint]"
+            },
+            {
+              "name": "form-recognizer-key",
+              "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-formrecognizer', variables('resourcePrefix'))), '2023-05-01').key1]"
+            },
+            {
+              "name": "openai-endpoint",
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', variables('resourcePrefix'))), '2023-05-01').endpoint]"
+            },
+            {
+              "name": "openai-key",
+              "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', variables('resourcePrefix'))), '2023-05-01').key1]"
+            },
+            {
+              "name": "cognitive-search-endpoint",
+              "value": "[format('https://{0}.search.windows.net', format('{0}-search', variables('resourcePrefix')))]"
+            },
+            {
+              "name": "cognitive-search-key",
+              "value": "[listAdminKeys(resourceId('Microsoft.Search/searchServices', format('{0}-search', variables('resourcePrefix'))), '2023-11-01').primaryKey]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "ai-processing",
+              "image": "[format('{0}acr.azurecr.io/ai-processing:latest', variables('resourcePrefix'))]",
+              "resources": {
+                "cpu": "[json('1.0')]",
+                "memory": "2Gi"
+              },
+              "env": [
+                {
+                  "name": "FORM_RECOGNIZER_ENDPOINT",
+                  "secretRef": "form-recognizer-endpoint"
+                },
+                {
+                  "name": "FORM_RECOGNIZER_KEY",
+                  "secretRef": "form-recognizer-key"
+                },
+                {
+                  "name": "OPENAI_ENDPOINT",
+                  "secretRef": "openai-endpoint"
+                },
+                {
+                  "name": "OPENAI_API_KEY",
+                  "secretRef": "openai-key"
+                },
+                {
+                  "name": "COGNITIVE_SEARCH_ENDPOINT",
+                  "secretRef": "cognitive-search-endpoint"
+                },
+                {
+                  "name": "COGNITIVE_SEARCH_KEY",
+                  "secretRef": "cognitive-search-key"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": "[if(equals(parameters('environment'), 'dev'), 1, 2)]",
+            "maxReplicas": "[if(equals(parameters('environment'), 'dev'), 5, 15)]",
+            "rules": [
+              {
+                "name": "http-scaling",
+                "http": {
+                  "metadata": {
+                    "concurrentRequests": "20"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-formrecognizer', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.Search/searchServices', format('{0}-search', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-analytics', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8002,
+            "allowInsecure": false,
+            "traffic": [
+              {
+                "weight": 100,
+                "latestRevision": true
+              }
+            ]
+          },
+          "registries": [
+            {
+              "server": "[format('{0}{1}acr{2}.azurecr.io', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "username": "[format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))), '2023-07-01').passwords[0].value]"
+            },
+            {
+              "name": "application-insights-connection-string",
+              "value": "[reference(resourceId('Microsoft.Insights/components', format('{0}-appinsights', variables('resourcePrefix'))), '2020-02-02').ConnectionString]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "analytics",
+              "image": "[format('{0}acr.azurecr.io/analytics:latest', variables('resourcePrefix'))]",
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1Gi"
+              },
+              "env": [
+                {
+                  "name": "APPLICATION_INSIGHTS_CONNECTION_STRING",
+                  "secretRef": "application-insights-connection-string"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": "[if(equals(parameters('environment'), 'dev'), 1, 2)]",
+            "maxReplicas": "[if(equals(parameters('environment'), 'dev'), 3, 8)]",
+            "rules": [
+              {
+                "name": "http-scaling",
+                "http": {
+                  "metadata": {
+                    "concurrentRequests": "50"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/components', format('{0}-appinsights', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-api-gateway', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8003,
+            "allowInsecure": false,
+            "traffic": [
+              {
+                "weight": 100,
+                "latestRevision": true
+              }
+            ]
+          },
+          "registries": [
+            {
+              "server": "[format('{0}{1}acr{2}.azurecr.io', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "username": "[format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))), '2023-07-01').passwords[0].value]"
+            },
+            {
+              "name": "jwt-secret-key",
+              "value": "your-jwt-secret-key-here"
+            },
+            {
+              "name": "key-vault-url",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', variables('resourcePrefix'))), '2023-07-01').vaultUri]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "api-gateway",
+              "image": "[format('{0}acr.azurecr.io/api-gateway:latest', variables('resourcePrefix'))]",
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1Gi"
+              },
+              "env": [
+                {
+                  "name": "JWT_SECRET_KEY",
+                  "secretRef": "jwt-secret-key"
+                },
+                {
+                  "name": "KEY_VAULT_URL",
+                  "secretRef": "key-vault-url"
+                },
+                {
+                  "name": "REDIS_CONNECTION_STRING",
+                  "value": "[format('redis://{0}:6380,ssl=true', reference(resourceId('Microsoft.Cache/redis', format('{0}-redis', variables('resourcePrefix'))), '2023-08-01').hostName)]"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": "[if(equals(parameters('environment'), 'dev'), 1, 2)]",
+            "maxReplicas": "[if(equals(parameters('environment'), 'dev'), 3, 10)]",
+            "rules": [
+              {
+                "name": "http-scaling",
+                "http": {
+                  "metadata": {
+                    "concurrentRequests": "100"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.Cache/redis', format('{0}-redis', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}-logs', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": "[if(equals(parameters('environment'), 'dev'), 30, 90)]"
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[format('{0}-appinsights', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', variables('resourcePrefix')))]",
+        "publicNetworkAccessForIngestion": "Enabled",
+        "publicNetworkAccessForQuery": "Enabled"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "[if(equals(parameters('environment'), 'dev'), 'Basic', 'Standard')]"
+      },
+      "properties": {
+        "adminUserEnabled": true
+      }
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}-kv', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "tenantId": "[tenant().tenantId]",
+        "accessPolicies": [],
+        "enabledForDeployment": false,
+        "enabledForDiskEncryption": false,
+        "enabledForTemplateDeployment": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 90,
+        "enableRbacAuthorization": true,
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Cache/redis",
+      "apiVersion": "2023-08-01",
+      "name": "[format('{0}-redis', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "sku": {
+          "name": "[if(equals(parameters('environment'), 'dev'), 'Basic', 'Standard')]",
+          "family": "C",
+          "capacity": "[if(equals(parameters('environment'), 'dev'), 0, 1)]"
+        },
+        "enableNonSslPort": false,
+        "minimumTlsVersion": "1.2",
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-vnet', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "default",
+            "properties": {
+              "addressPrefix": "10.0.0.0/23"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}', format('{0}-vnet', variables('resourcePrefix')), 'default')]",
+      "properties": {
+        "addressPrefix": "10.0.1.0/24"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('resourcePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-ai-chat', variables('resourcePrefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8004,
+            "allowInsecure": false,
+            "traffic": [
+              {
+                "weight": 100,
+                "latestRevision": true
+              }
+            ]
+          },
+          "registries": [
+            {
+              "server": "[format('{0}{1}acr{2}.azurecr.io', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "username": "[format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))), '2023-07-01').passwords[0].value]"
+            },
+            {
+              "name": "openai-api-key",
+              "value": "your-openai-api-key"
+            },
+            {
+              "name": "cognitive-search-key",
+              "value": "your-cognitive-search-key"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "ai-chat",
+              "image": "[format('{0}acr.azurecr.io/ai-chat:latest', variables('resourcePrefix'))]",
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1Gi"
+              },
+              "env": [
+                {
+                  "name": "OPENAI_API_KEY",
+                  "secretRef": "openai-api-key"
+                },
+                {
+                  "name": "COGNITIVE_SEARCH_KEY",
+                  "secretRef": "cognitive-search-key"
+                },
+                {
+                  "name": "STORAGE_CONNECTION_STRING",
+                  "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix=core.windows.net', format('{0}st', variables('storagePrefix')), listKeys(resourceId('Microsoft.Storage/storageAccounts', format('{0}st', variables('storagePrefix'))), '2023-01-01').keys[0].value)]"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": "[if(equals(parameters('environment'), 'dev'), 1, 2)]",
+            "maxReplicas": "[if(equals(parameters('environment'), 'dev'), 3, 10)]",
+            "rules": [
+              {
+                "name": "http-scaling",
+                "http": {
+                  "metadata": {
+                    "concurrentRequests": "50"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-container-env', variables('resourcePrefix')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', format('{0}st', variables('storagePrefix')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "storageAccountName": {
+      "type": "string",
+      "value": "[format('{0}st', variables('storagePrefix'))]"
+    },
+    "storageAccountKey": {
+      "type": "string",
+      "value": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', format('{0}st', variables('storagePrefix'))), '2023-01-01').keys[0].value]"
+    },
+    "dataLakeStorageAccountName": {
+      "type": "string",
+      "value": "[format('{0}dl', variables('storagePrefix'))]"
+    },
+    "dataLakeStorageAccountKey": {
+      "type": "string",
+      "value": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', format('{0}dl', variables('storagePrefix'))), '2023-01-01').keys[0].value]"
+    },
+    "sqlServerName": {
+      "type": "string",
+      "value": "[format('{0}sql{1}', variables('resourcePrefix'), uniqueString(resourceGroup().id))]"
+    },
+    "sqlDatabaseName": {
+      "type": "string",
+      "value": "documentintelligence"
+    },
+    "sqlConnectionString": {
+      "type": "string",
+      "value": "[format('Server=tcp:{0},1433;Initial Catalog={1};Persist Security Info=False;User ID=sqladmin;Password=TempPassword123!;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;', reference(resourceId('Microsoft.Sql/servers', format('{0}sql{1}', variables('resourcePrefix'), uniqueString(resourceGroup().id))), '2023-05-01-preview').fullyQualifiedDomainName, 'documentintelligence')]"
+    },
+    "eventHubConnectionString": {
+      "type": "string",
+      "value": "[listKeys(resourceId('Microsoft.EventHub/namespaces', format('{0}-eventhub', variables('resourcePrefix'))), '2023-01-01-preview').primaryConnectionString]"
+    },
+    "serviceBusConnectionString": {
+      "type": "string",
+      "value": "[listKeys(resourceId('Microsoft.ServiceBus/namespaces', format('{0}-servicebus', variables('resourcePrefix'))), '2022-10-01-preview').primaryConnectionString]"
+    },
+    "formRecognizerEndpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-formrecognizer', variables('resourcePrefix'))), '2023-05-01').endpoint]"
+    },
+    "formRecognizerKey": {
+      "type": "string",
+      "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-formrecognizer', variables('resourcePrefix'))), '2023-05-01').key1]"
+    },
+    "openaiEndpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', variables('resourcePrefix'))), '2023-05-01').endpoint]"
+    },
+    "openaiKey": {
+      "type": "string",
+      "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', variables('resourcePrefix'))), '2023-05-01').key1]"
+    },
+    "searchEndpoint": {
+      "type": "string",
+      "value": "[format('https://{0}.search.windows.net', format('{0}-search', variables('resourcePrefix')))]"
+    },
+    "searchKey": {
+      "type": "string",
+      "value": "[listAdminKeys(resourceId('Microsoft.Search/searchServices', format('{0}-search', variables('resourcePrefix'))), '2023-11-01').primaryKey]"
+    },
+    "applicationInsightsConnectionString": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Insights/components', format('{0}-appinsights', variables('resourcePrefix'))), '2020-02-02').ConnectionString]"
+    },
+    "keyVaultUri": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.KeyVault/vaults', format('{0}-kv', variables('resourcePrefix'))), '2023-07-01').vaultUri]"
+    },
+    "redisHostName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Cache/redis', format('{0}-redis', variables('resourcePrefix'))), '2023-08-01').hostName]"
+    },
+    "containerRegistryLoginServer": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', format('{0}{1}acr{2}', parameters('appNamePrefix'), parameters('environment'), variables('uniqueSuffix'))), '2023-07-01').loginServer]"
+    },
+    "apiGatewayUrl": {
+      "type": "string",
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-api-gateway', variables('resourcePrefix'))), '2023-05-01').configuration.ingress.fqdn)]"
+    }
+  }
+}

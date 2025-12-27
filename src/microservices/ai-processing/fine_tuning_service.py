@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from enum import Enum
 import pandas as pd
 import numpy as np
-from azure.openai import AzureOpenAI
+from openai import AzureOpenAI
 from azure.core.exceptions import AzureError
 
 from src.shared.config.settings import config_manager

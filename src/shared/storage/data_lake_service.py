@@ -1,5 +1,13 @@
-from azure.storage.filedatalake import DataLakeServiceClient
-from azure.core.exceptions import ResourceNotFoundError
+# Azure imports (optional)
+try:
+    from azure.storage.filedatalake import DataLakeServiceClient
+    from azure.core.exceptions import ResourceNotFoundError
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    DataLakeServiceClient = None
+    ResourceNotFoundError = Exception
+
 import logging
 from typing import Optional, List
 import json

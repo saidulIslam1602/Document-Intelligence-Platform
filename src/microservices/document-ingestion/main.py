@@ -550,9 +550,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 import json
-from azure.storage.blob import BlobServiceClient
-from azure.eventhub import EventHubProducerClient
-from azure.servicebus import ServiceBusClient, ServiceBusMessage
+
+# Azure imports (optional for local development)
+try:
+    from azure.storage.blob import BlobServiceClient
+    from azure.eventhub import EventHubProducerClient
+    from azure.servicebus import ServiceBusClient, ServiceBusMessage
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    BlobServiceClient = None
+    EventHubProducerClient = None
+    ServiceBusClient = None
+    ServiceBusMessage = None
 
 from src.shared.config.settings import config_manager
 from src.shared.events.event_sourcing import (
@@ -685,7 +695,7 @@ async def health_check():
 
 # Document upload endpoint
 @app.post("/documents/upload", response_model=DocumentUploadResponse)
-@monitor_performance("document_upload", {"service": "document-ingestion"})
+@monitor_performance(threshold=2.0)  # Fixed: only takes threshold parameter
 async def upload_document(
     file: UploadFile = File(...),
     user_id: str = Depends(get_current_user),
@@ -742,8 +752,10 @@ async def upload_document(
             except Exception as e:
                 logger.warning(f"Failed to upload to blob storage: {str(e)}")
         else:
-            # Development mode - store locally or skip
-            logger.info(f"Blob storage not configured - document {document_id} stored in memory")
+            # Development mode - store locally
+            from src.shared.storage.local_storage import local_storage
+            local_storage.save_document_content(document_id, file.filename, file_content)
+            logger.info(f"Blob storage not configured - document {document_id} stored locally")
             upload_url = f"file://{blob_name}"
         
         # Create document record in SQL Database
@@ -767,7 +779,10 @@ async def upload_document(
             except Exception as e:
                 logger.warning(f"Failed to store document in SQL Database: {str(e)}")
         else:
-            logger.info(f"SQL storage not configured - document {document_id} metadata stored in memory")
+            # Development mode - store metadata locally
+            from src.shared.storage.local_storage import local_storage
+            local_storage.save_document_metadata(document_id, document_record)
+            logger.info(f"SQL storage not configured - document {document_id} metadata stored locally")
         
         # Store processing job in SQL Database
         if sql_service.enabled:
@@ -834,7 +849,7 @@ async def upload_document(
 
 # Batch upload endpoint
 @app.post("/documents/batch-upload", response_model=BatchUploadResponse)
-@monitor_performance("batch_document_upload", {"service": "document-ingestion"})
+@monitor_performance(threshold=2.0)
 async def batch_upload_documents(
     files: List[UploadFile] = File(..., description="Multiple files to upload (10-15 documents)"),
     user_id: str = Depends(get_current_user),
@@ -1169,7 +1184,24 @@ async def publish_event(event: DocumentUploadedEvent):
 async def schedule_document_processing(document_id: str, user_id: str):
     """Schedule document for processing"""
     if not service_bus_client:
-        logger.info(f"Service Bus not configured - processing for document {document_id} scheduled locally")
+        logger.info(f"Service Bus not configured - calling AI processing service directly")
+        # Call AI processing service directly via HTTP for local development
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    "http://ai-processing:8001/process",
+                    json={
+                        "document_id": document_id,
+                        "user_id": user_id
+                    }
+                )
+                if response.status_code == 200:
+                    logger.info(f"Document {document_id} sent to AI processing service")
+                else:
+                    logger.warning(f"AI processing returned status {response.status_code}")
+        except Exception as e:
+            logger.error(f"Error calling AI processing service: {str(e)}")
         return
     
     try:

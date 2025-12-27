@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 import httpx
 
-from .fine_tuning_service import DocumentFineTuningService
-from .fine_tuning_workflow import DocumentFineTuningWorkflow
+from fine_tuning_service import DocumentFineTuningService
+from fine_tuning_workflow import DocumentFineTuningWorkflow
 from src.shared.config.settings import config_manager
 from src.shared.storage.sql_service import SQLService
 

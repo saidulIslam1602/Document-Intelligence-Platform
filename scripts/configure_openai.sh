@@ -59,6 +59,6 @@ echo "To test the configuration:"
 echo "  python3 scripts/test_openai.py"
 echo ""
 echo "To start services:"
-echo "  ./scripts/run_local.sh"
+echo "  ./start.sh"
 echo ""
 

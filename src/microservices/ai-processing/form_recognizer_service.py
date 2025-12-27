@@ -523,9 +523,19 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 import json
-from azure.ai.formrecognizer import DocumentAnalysisClient
-from azure.core.credentials import AzureKeyCredential
-from azure.core.exceptions import ResourceNotFoundError, ServiceRequestError
+
+# Azure imports (optional)
+try:
+    from azure.ai.formrecognizer import DocumentAnalysisClient
+    from azure.core.credentials import AzureKeyCredential
+    from azure.core.exceptions import ResourceNotFoundError, ServiceRequestError
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    DocumentAnalysisClient = None
+    AzureKeyCredential = None
+    ResourceNotFoundError = Exception
+    ServiceRequestError = Exception
 
 from src.shared.config.settings import config_manager
 from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus

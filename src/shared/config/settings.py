@@ -8,8 +8,16 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from enum import Enum
 import json
-from azure.keyvault.secrets import SecretClient
-from azure.identity import DefaultAzureCredential
+
+# Azure imports (optional for local development)
+try:
+    from azure.keyvault.secrets import SecretClient
+    from azure.identity import DefaultAzureCredential
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    SecretClient = None
+    DefaultAzureCredential = None
 
 class Environment(Enum):
     """Environment types"""

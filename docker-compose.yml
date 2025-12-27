@@ -1,6 +1,25 @@
-version: '3.8'
-
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: docintel-postgres
+    environment:
+      POSTGRES_DB: documentintelligence
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - docintel-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d documentintelligence"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Redis for caching and rate limiting
   redis:
     image: redis:7-alpine
@@ -33,6 +52,7 @@ services:
       - docintel-network
     volumes:
       - ./src:/app/src
+      - document_storage:/tmp/document_storage
     restart: unless-stopped
 
   # AI Processing Service
@@ -59,6 +79,7 @@ services:
       - docintel-network
     volumes:
       - ./src:/app/src
+      - document_storage:/tmp/document_storage
     restart: unless-stopped
 
   # Analytics Service
@@ -210,8 +231,14 @@ services:
       - ANALYTICS_URL=http://analytics:8002
       - MCP_SERVER_URL=http://mcp-server:8012
       - AI_CHAT_URL=http://ai-chat:8004
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=documentintelligence
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin123
     depends_on:
       - redis
+      - postgres
       - document-ingestion
       - ai-processing
       - analytics
@@ -223,21 +250,22 @@ services:
       - ./src:/app/src
     restart: unless-stopped
 
-  # Nginx Load Balancer
-  nginx:
-    image: nginx:alpine
-    container_name: docintel-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - api-gateway
-    networks:
-      - docintel-network
-    restart: unless-stopped
+  # Nginx Load Balancer (Optional - disabled by default due to port conflicts)
+  # Uncomment and modify ports if needed
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: docintel-nginx
+  #   ports:
+  #     - "8080:80"  # Changed to 8080 to avoid conflicts
+  #     - "8443:443"
+  #   volumes:
+  #     - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+  #     - ./nginx/ssl:/etc/nginx/ssl
+  #   depends_on:
+  #     - api-gateway
+  #   networks:
+  #     - docintel-network
+  #   restart: unless-stopped
 
   # Prometheus for monitoring
   prometheus:
@@ -290,47 +318,46 @@ services:
       - docintel-network
     restart: unless-stopped
 
-  # Elasticsearch for logging
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
-    container_name: docintel-elasticsearch
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    ports:
-      - "9200:9200"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-    networks:
-      - docintel-network
-    restart: unless-stopped
+  # Elasticsearch, Kibana, Logstash - Disabled by default (heavy services)
+  # Uncomment if you need full ELK stack for production logging
+  # elasticsearch:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+  #   container_name: docintel-elasticsearch
+  #   environment:
+  #     - discovery.type=single-node
+  #     - xpack.security.enabled=false
+  #     - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+  #   ports:
+  #     - "9200:9200"
+  #   volumes:
+  #     - elasticsearch_data:/usr/share/elasticsearch/data
+  #   networks:
+  #     - docintel-network
+  #   restart: unless-stopped
 
-  # Kibana for log visualization
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.8.0
-    container_name: docintel-kibana
-    ports:
-      - "5601:5601"
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    depends_on:
-      - elasticsearch
-    networks:
-      - docintel-network
-    restart: unless-stopped
+  # kibana:
+  #   image: docker.elastic.co/kibana/kibana:8.8.0
+  #   container_name: docintel-kibana
+  #   ports:
+  #     - "5601:5601"
+  #   environment:
+  #     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+  #   depends_on:
+  #     - elasticsearch
+  #   networks:
+  #     - docintel-network
+  #   restart: unless-stopped
 
-  # Logstash for log processing
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.8.0
-    container_name: docintel-logstash
-    volumes:
-      - ./monitoring/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
-    depends_on:
-      - elasticsearch
-    networks:
-      - docintel-network
-    restart: unless-stopped
+  # logstash:
+  #   image: docker.elastic.co/logstash/logstash:8.8.0
+  #   container_name: docintel-logstash
+  #   volumes:
+  #     - ./monitoring/logstash/logstash.conf:/usr/share/logstash/pipeline
+  #   depends_on:
+  #     - elasticsearch
+  #   networks:
+  #     - docintel-network
+  #   restart: unless-stopped
 
   # MCP Server (Port 8012 - Model Context Protocol)
   mcp-server:
@@ -430,10 +457,12 @@ services:
     restart: unless-stopped
 
 volumes:
+  postgres_data:
   redis_data:
   prometheus_data:
   grafana_data:
   elasticsearch_data:
+  document_storage:
 
 networks:
   docintel-network:
