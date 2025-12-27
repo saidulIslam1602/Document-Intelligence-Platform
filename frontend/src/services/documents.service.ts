@@ -17,7 +17,7 @@ class DocumentsService {
     formData.append('file', file);
 
     const response = await api.post('/documents/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      // Don't set Content-Type manually - let axios set it with boundary
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {
           const progress = (progressEvent.loaded / progressEvent.total) * 100;
@@ -33,9 +33,7 @@ class DocumentsService {
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
 
-    const response = await api.post('/documents/batch-upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    const response = await api.post('/documents/batch-upload', formData);
 
     return response.data.documents || [];
   }

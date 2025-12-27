@@ -66,10 +66,12 @@ export default function Documents() {
   const startUpload = async () => {
     if (selectedFiles.length === 0) return;
     
+    console.log('Starting upload for', selectedFiles.length, 'file(s)');
     setUploading(true);
     
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
+      console.log('Uploading file:', file.name, 'Size:', file.size, 'Type:', file.type);
       
       // Update status to uploading
       setUploadProgress(prev => prev.map((item, idx) => 
@@ -89,13 +91,27 @@ export default function Documents() {
           idx === i ? { ...item, status: 'success', progress: 100 } : item
         ));
       } catch (error: any) {
+        console.error('Upload error for', file.name, ':', error);
+        console.error('Error response:', error.response?.data);
+        console.error('Error status:', error.response?.status);
+        
+        // Get detailed error message
+        let errorMessage = 'Upload failed';
+        if (error.response?.data?.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
         // Mark as error
         setUploadProgress(prev => prev.map((item, idx) => 
           idx === i ? { 
             ...item, 
             status: 'error', 
             progress: 0,
-            error: error.response?.data?.detail || 'Upload failed'
+            error: errorMessage
           } : item
         ));
       }
