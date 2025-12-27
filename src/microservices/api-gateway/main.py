@@ -1342,7 +1342,12 @@ async def upload_document(request: Request):
             logger.info(f"Document {result.get('document_id')} uploaded and queued for AI processing with OCR")
             return result
             
-            # Generate industry-standard invoice extraction
+    except Exception as e:
+        logger.error(f"Upload error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@app.delete("/documents/{document_id}")
+async def delete_document(document_id: str, request: Request):
             invoice_hash = hash(filename)
             invoice_num = abs(invoice_hash) % 100000
             vendor_id = abs(invoice_hash) % 20
