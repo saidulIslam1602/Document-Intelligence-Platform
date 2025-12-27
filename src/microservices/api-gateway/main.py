@@ -1128,22 +1128,33 @@ async def get_documents(limit: int = 10, offset: int = 0):
         "documents": [
             {
                 "id": "doc1",
-                "name": "Sample Invoice.pdf",
+                "filename": "Sample Invoice.pdf",
                 "type": "invoice",
                 "status": "processed",
                 "uploaded_at": "2025-12-27T10:00:00Z",
-                "size": 45678
+                "size": 45678,
+                "confidence": 0.95
             },
             {
                 "id": "doc2",
-                "name": "Receipt.jpg",
+                "filename": "Receipt.jpg",
                 "type": "receipt",
                 "status": "processed",
                 "uploaded_at": "2025-12-27T09:30:00Z",
-                "size": 12345
+                "size": 12345,
+                "confidence": 0.92
+            },
+            {
+                "id": "doc3",
+                "filename": "Contract Agreement.pdf",
+                "type": "contract",
+                "status": "processing",
+                "uploaded_at": "2025-12-27T11:15:00Z",
+                "size": 98765,
+                "confidence": 0.88
             }
         ],
-        "total": 2,
+        "total": 3,
         "limit": limit,
         "offset": offset
     }

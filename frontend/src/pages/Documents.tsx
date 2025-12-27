@@ -34,7 +34,7 @@ export default function Documents() {
 
   useEffect(() => {
     const filtered = documents.filter(doc =>
-      doc.filename.toLowerCase().includes(searchQuery.toLowerCase())
+      doc.filename?.toLowerCase().includes(searchQuery.toLowerCase())
     );
     setFilteredDocs(filtered);
   }, [searchQuery, documents]);
