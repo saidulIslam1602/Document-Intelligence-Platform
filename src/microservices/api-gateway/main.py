@@ -1466,7 +1466,7 @@ async def delete_document(document_id: str, request: Request):
         logger.info(f"API Gateway: Deleting document {document_id} for user {user_id}")
         async with httpx.AsyncClient() as client:
             response = await client.delete(
-                f"http://{DOCUMENT_INGESTION_SERVICE}/documents/{document_id}",
+                f"http://docintel-document-ingestion:8000/documents/{document_id}",
                 headers={"X-User-ID": user_id},
                 timeout=30.0
             )

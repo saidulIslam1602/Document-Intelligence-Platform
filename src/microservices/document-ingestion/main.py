@@ -1131,9 +1131,52 @@ async def list_user_documents(
 @app.delete("/documents/{document_id}")
 async def delete_document(
     document_id: str,
-    user_id: str = Depends(get_current_user)
+    request: Request
 ):
     """Delete a document and its associated data"""
+    try:
+        user_id = request.headers.get("X-User-ID", "demo1234")
+        logger.info(f"Deleting document {document_id} for user {user_id}")
+        
+        if DATABASE_AVAILABLE:
+            # Delete from PostgreSQL
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            
+            # Delete related data first
+            cursor.execute("DELETE FROM document_entities WHERE document_id = %s", (document_id,))
+            cursor.execute("DELETE FROM invoice_extractions WHERE document_id = %s", (document_id,))
+            cursor.execute("DELETE FROM documents WHERE id = %s", (document_id,))
+            
+            conn.commit()
+            cursor.close()
+            
+            logger.info(f"Document {document_id} deleted from PostgreSQL")
+        
+        # Delete from local storage if exists
+        if local_storage_service:
+            try:
+                local_storage_service.delete_document(document_id)
+                logger.info(f"Document {document_id} deleted from local storage")
+            except Exception as e:
+                logger.warning(f"Could not delete from local storage: {e}")
+        
+        return {
+            "message": "Document deleted successfully",
+            "document_id": document_id
+        }
+    except Exception as e:
+        logger.error(f"Error deleting document {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
+# Old Azure-based delete code below (not used in local mode)
+'''
+@app.delete("/documents/{document_id}_old")
+async def delete_document_azure(
+    document_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """Delete a document and its associated data (Azure version)"""
     try:
         container = database.get_container_client("documents")
         
