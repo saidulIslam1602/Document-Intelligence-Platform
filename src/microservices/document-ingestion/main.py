@@ -1170,34 +1170,6 @@ async def delete_document(
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
 
 # Helper functions
-        )
-        
-        try:
-            await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: blob_client.delete_blob()
-            )
-        except Exception as e:
-            logger.warning(f"Could not delete blob: {str(e)}")
-        
-        # Delete from Azure SQL Database
-        await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: container.delete_item(
-                item=document_id,
-                partition_key=user_id
-            )
-        )
-        
-        logger.info(f"Document {document_id} deleted by user {user_id}")
-        
-        return {"message": "Document deleted successfully"}
-        
-    except Exception as e:
-        logger.error(f"Error deleting document: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-# Helper functions
 async def publish_event(event: DocumentUploadedEvent):
     """Publish event to Event Hub"""
     if not event_hub_producer:
