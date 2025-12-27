@@ -697,6 +697,7 @@ security = HTTPBearer()
 
 # Global variables
 config = config_manager.get_azure_config()
+security_config = config_manager.get_security_config()
 logger = logging.getLogger(__name__)
 
 # Redis configuration from environment variables
@@ -909,7 +910,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             # Decode JWT token
             payload = jwt.decode(
                 token,
-                config.jwt_secret_key,
+                security_config.jwt_secret_key,
                 algorithms=["HS256"],
                 options={"verify_exp": True}
             )
@@ -1487,7 +1488,7 @@ def generate_jwt_token(user: User) -> str:
         "iat": datetime.utcnow()
     }
     
-    return jwt.encode(payload, config.jwt_secret_key, algorithm="HS256")
+    return jwt.encode(payload, security_config.jwt_secret_key, algorithm="HS256")
 
 async def validate_token(token: str) -> Optional[User]:
     """Validate JWT token"""
@@ -1498,7 +1499,7 @@ async def validate_token(token: str) -> Optional[User]:
             return None
         
         # Decode token
-        payload = jwt.decode(token, config.jwt_secret_key, algorithms=["HS256"])
+        payload = jwt.decode(token, security_config.jwt_secret_key, algorithms=["HS256"])
         
         return User(
             user_id=payload["user_id"],
