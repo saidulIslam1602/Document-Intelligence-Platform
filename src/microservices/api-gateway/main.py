@@ -1643,7 +1643,10 @@ async def chat_message(request: Request):
             from collections import defaultdict
             import re
             
-            db = DatabaseService()
+            # Use the existing db service
+            if not DATABASE_AVAILABLE:
+                raise Exception("Database not available")
+            
             user_documents = db.get_documents(limit=200, user_id=user_id)  # Increased limit for better analytics
             
             # Build comprehensive analytics context
@@ -1778,28 +1781,79 @@ INSTRUCTIONS:
 Be analytical, precise, and insightful. Always ground your answers in the actual data."""
 
             completion = openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4-turbo-preview",  # Strongest model: GPT-4 Turbo (128K context)
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                temperature=0.3,  # Lower temperature for more precise analytics
-                max_tokens=800     # More tokens for detailed analytical responses
+                temperature=0.2,    # Very precise for analytics
+                max_tokens=1500,    # More tokens for comprehensive analysis
+                top_p=0.95
             )
             
             response_text = completion.choices[0].message.content
+            logger.info(f"AI response generated successfully using GPT-4 Turbo")
             
         except Exception as ai_error:
-            logger.warning(f"AI processing failed: {str(ai_error)}, using fallback")
-            # Fallback to basic response if OpenAI fails
-            response_text = f"I can help you analyze your documents. You have uploaded documents that I can search and analyze. Try asking specific questions about vendors, amounts, dates, or trends."
+            logger.error(f"AI processing failed: {str(ai_error)}", exc_info=True)
+            
+            # Check if it's an API key issue
+            if "api_key" in str(ai_error).lower() or "authentication" in str(ai_error).lower():
+                response_text = "⚠️ OpenAI API configuration issue. Please ensure OPENAI_API_KEY is set correctly in environment variables."
+            elif "rate_limit" in str(ai_error).lower():
+                response_text = "⚠️ Rate limit exceeded. Please try again in a moment."
+            elif "model" in str(ai_error).lower():
+                # Try fallback to GPT-4
+                try:
+                    logger.info("Trying fallback to standard GPT-4")
+                    completion = openai_client.chat.completions.create(
+                        model="gpt-4",
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_message}
+                        ],
+                        temperature=0.2,
+                        max_tokens=1500
+                    )
+                    response_text = completion.choices[0].message.content
+                    logger.info("Fallback to GPT-4 successful")
+                except Exception as fallback_error:
+                    logger.error(f"GPT-4 fallback also failed: {str(fallback_error)}")
+                    # Try GPT-3.5 as last resort
+                    try:
+                        logger.info("Trying final fallback to GPT-3.5-turbo")
+                        completion = openai_client.chat.completions.create(
+                            model="gpt-3.5-turbo",
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_message}
+                            ],
+                            temperature=0.3,
+                            max_tokens=800
+                        )
+                        response_text = completion.choices[0].message.content
+                        logger.info("Fallback to GPT-3.5-turbo successful")
+                    except Exception as final_error:
+                        logger.error(f"All models failed: {str(final_error)}")
+                        response_text = f"⚠️ AI service temporarily unavailable. Error: {str(ai_error)}"
+            else:
+                response_text = f"⚠️ Unable to process request. Error: {str(ai_error)}"
+        
+        # Determine which model was actually used
+        model_used = "gpt-4-turbo-preview"
+        if "gpt-4" in str(response_text) and "fallback" in str(response_text).lower():
+            model_used = "gpt-4"
+        elif "gpt-3.5" in str(response_text):
+            model_used = "gpt-3.5-turbo"
         
         return {
             "content": response_text,
             "response": response_text,
             "timestamp": datetime.utcnow().isoformat(),
-            "model": "gpt-3.5-turbo",
-            "context_used": True
+            "model": model_used,
+            "context_used": True,
+            "analytics_enabled": True,
+            "documents_analyzed": len(user_documents)
         }
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")

@@ -6,6 +6,15 @@ cd "$(dirname "$0")/.."
 # Load environment from .env.local if it exists
 if [ -f .env.local ]; then
     export $(cat .env.local | grep -v '^#' | xargs)
+    echo "✓ Environment variables loaded from .env.local"
+fi
+
+# Verify OpenAI API key is set
+if [ -n "$OPENAI_API_KEY" ]; then
+    echo "✓ OpenAI API Key: ${OPENAI_API_KEY:0:10}...${OPENAI_API_KEY: -4}"
+    echo "✓ Using GPT-4 Turbo for enterprise-grade AI capabilities"
+else
+    echo "⚠️ Warning: OPENAI_API_KEY not set - AI chat will use fallback"
 fi
 
 # Ensure Redis configuration for local development
@@ -14,6 +23,7 @@ export REDIS_PORT=${REDIS_PORT:-6382}
 
 echo "Starting API Gateway..."
 echo "- Redis: $REDIS_HOST:$REDIS_PORT"
+echo "- AI Model: GPT-4 Turbo (gpt-4-turbo-preview)"
 
 # Kill any existing API Gateway process
 pkill -f "uvicorn.*api-gateway" 2>/dev/null || true
