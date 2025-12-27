@@ -11,9 +11,18 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 import httpx
-from azure.monitor.query import MetricsQueryClient, LogsQueryClient
-from azure.identity import DefaultAzureCredential
-from azure.monitor.query import MetricsQueryClient, LogsQueryClient
+
+# Azure imports (optional)
+try:
+    from azure.monitor.query import MetricsQueryClient, LogsQueryClient
+    from azure.identity import DefaultAzureCredential
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    MetricsQueryClient = None
+    LogsQueryClient = None
+    DefaultAzureCredential = None
+
 # from azure.mgmt.monitor import MonitorManagementClient
 # from azure.mgmt.monitor.models import (
 #     MetricAlertResource, MetricAlertSingleResourceMultipleMetricCriteria,

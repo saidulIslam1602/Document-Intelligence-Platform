@@ -549,11 +549,18 @@ class FormRecognizerService:
         self.event_bus = event_bus
         self.logger = logging.getLogger(__name__)
         
-        # Initialize Form Recognizer client
-        self.client = DocumentAnalysisClient(
-            endpoint=self.config.form_recognizer_endpoint,
-            credential=AzureKeyCredential(self.config.form_recognizer_key)
-        )
+        # Initialize Form Recognizer client (only if Azure is available)
+        if AZURE_AVAILABLE and self.config.form_recognizer_endpoint and self.config.form_recognizer_key:
+            self.client = DocumentAnalysisClient(
+                endpoint=self.config.form_recognizer_endpoint,
+                credential=AzureKeyCredential(self.config.form_recognizer_key)
+            )
+            self.enabled = True
+            self.logger.info("Form Recognizer service initialized successfully")
+        else:
+            self.client = None
+            self.enabled = False
+            self.logger.info("Form Recognizer not configured - running in local mode without Azure Form Recognizer")
         
         # Supported document types and their models
         self.document_models = {

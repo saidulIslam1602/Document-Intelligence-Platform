@@ -10,10 +10,20 @@ from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
 import pyodbc
 import redis.asyncio as redis
-from azure.storage.blob import BlobServiceClient
-from azure.storage.filedatalake import DataLakeServiceClient
-from azure.eventhub import EventHubProducerClient
-from azure.servicebus import ServiceBusClient
+
+# Azure imports (optional)
+try:
+    from azure.storage.blob import BlobServiceClient
+    from azure.storage.filedatalake import DataLakeServiceClient
+    from azure.eventhub import EventHubProducerClient
+    from azure.servicebus import ServiceBusClient
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    BlobServiceClient = None
+    DataLakeServiceClient = None
+    EventHubProducerClient = None
+    ServiceBusClient = None
 
 from ..config.settings import config_manager
 

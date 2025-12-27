@@ -572,6 +572,7 @@ from src.shared.storage.data_lake_service import DataLakeService
 from src.shared.storage.sql_service import SQLService
 from src.shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
 from src.shared.monitoring.performance_monitor import monitor_performance
+from src.shared.storage.local_storage import LocalStorageService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -596,6 +597,9 @@ security = HTTPBearer()
 config = config_manager.get_azure_config()
 event_bus = EventBus()
 logger = logging.getLogger(__name__)
+
+# Initialize local storage
+local_storage_service = LocalStorageService()
 
 # Initialize storage services
 data_lake_service = DataLakeService(config.data_lake_connection_string)
@@ -1025,16 +1029,26 @@ async def get_document_status(
 ):
     """Get the processing status of a document"""
     try:
-        container = database.get_container_client("documents")
+        # Try local storage first
+        document_record = local_storage_service.get_document_metadata(document_id, user_id)
         
-        # Get document record
-        document_record = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: container.read_item(
-                item=document_id,
-                partition_key=user_id
-            )
-        )
+        if not document_record:
+            # Try database if available
+            if database and sql_service:
+                try:
+                    container = database.get_container_client("documents")
+                    document_record = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: container.read_item(
+                            item=document_id,
+                            partition_key=user_id
+                        )
+                    )
+                except Exception as db_error:
+                    logger.warning(f"Database query failed: {str(db_error)}")
+        
+        if not document_record:
+            raise HTTPException(status_code=404, detail="Document not found")
         
         # Calculate progress based on status
         progress_map = {
@@ -1047,21 +1061,36 @@ async def get_document_status(
         
         progress = progress_map.get(document_record.get("status", "uploaded"), 0.0)
         
+        # Parse dates
+        created_at = document_record.get("created_at")
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        elif not created_at:
+            created_at = datetime.utcnow()
+        
+        updated_at = document_record.get("updated_at")
+        if isinstance(updated_at, str):
+            updated_at = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+        elif not updated_at:
+            updated_at = datetime.utcnow()
+        
         return DocumentStatus(
             document_id=document_id,
             status=document_record.get("status", "unknown"),
             progress=progress,
-            created_at=datetime.fromisoformat(document_record.get("created_at", datetime.utcnow().isoformat())),
-            updated_at=datetime.fromisoformat(document_record.get("updated_at", datetime.utcnow().isoformat())),
+            created_at=created_at,
+            updated_at=updated_at,
             file_name=document_record.get("file_name", "unknown"),
             file_size=document_record.get("file_size", 0),
             processing_result=document_record.get("processing_result"),
             error_message=document_record.get("error_message")
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting document status: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error getting document status for {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 # List user documents endpoint
 @app.get("/documents")
