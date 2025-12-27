@@ -1120,6 +1120,45 @@ async def reset_all_rate_limiters():
     }
 
 # Service routing endpoints
+@app.get("/documents")
+async def get_documents(limit: int = 10, offset: int = 0):
+    """Get list of documents (mock endpoint for local dev)"""
+    logger.info(f"Fetching documents with limit={limit}, offset={offset}")
+    return {
+        "documents": [
+            {
+                "id": "doc1",
+                "name": "Sample Invoice.pdf",
+                "type": "invoice",
+                "status": "processed",
+                "uploaded_at": "2025-12-27T10:00:00Z",
+                "size": 45678
+            },
+            {
+                "id": "doc2",
+                "name": "Receipt.jpg",
+                "type": "receipt",
+                "status": "processed",
+                "uploaded_at": "2025-12-27T09:30:00Z",
+                "size": 12345
+            }
+        ],
+        "total": 2,
+        "limit": limit,
+        "offset": offset
+    }
+
+@app.post("/documents/upload")
+async def upload_document(request: Request):
+    """Upload a document (mock endpoint for local dev)"""
+    logger.info("Document upload request received")
+    return {
+        "document_id": f"doc_{hashlib.md5(str(datetime.utcnow()).encode()).hexdigest()[:8]}",
+        "status": "uploaded",
+        "message": "Document uploaded successfully (mock)",
+        "processing_status": "pending"
+    }
+
 @app.api_route("/documents/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def route_document_requests(request: Request, path: str):
     """Route requests to document ingestion service"""
@@ -1129,6 +1168,36 @@ async def route_document_requests(request: Request, path: str):
 async def route_processing_requests(request: Request, path: str):
     """Route requests to AI processing service"""
     return await route_request(request, "ai-processing", f"/process/{path}")
+
+@app.get("/analytics/automation-metrics")
+async def get_automation_metrics():
+    """Get automation metrics (mock endpoint for local dev)"""
+    logger.info("Fetching automation metrics")
+    return {
+        "total_documents": 1247,
+        "processed_today": 45,
+        "success_rate": 98.5,
+        "average_processing_time": 2.3,
+        "total_cost": 123.45,
+        "automation_savings": 5678.90,
+        "metrics": {
+            "documents_by_type": {
+                "invoice": 567,
+                "receipt": 345,
+                "contract": 234,
+                "other": 101
+            },
+            "processing_time_trend": [
+                {"date": "2025-12-20", "avg_time": 2.5},
+                {"date": "2025-12-21", "avg_time": 2.4},
+                {"date": "2025-12-22", "avg_time": 2.3},
+                {"date": "2025-12-23", "avg_time": 2.2},
+                {"date": "2025-12-24", "avg_time": 2.1},
+                {"date": "2025-12-25", "avg_time": 2.2},
+                {"date": "2025-12-26", "avg_time": 2.3}
+            ]
+        }
+    }
 
 @app.api_route("/analytics/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def route_analytics_requests(request: Request, path: str):
