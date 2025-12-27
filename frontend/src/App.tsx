@@ -3,6 +3,7 @@ import { useState, lazy, Suspense } from 'react';
 import { AppProvider } from './context/AppContext';
 import Layout from './components/layout/Layout';
 import LoadingSpinner from './components/common/LoadingSpinner';
+import ProtectedRoute from './components/common/ProtectedRoute';
 
 // Lazy load pages for code splitting - reduces initial bundle size
 const Login = lazy(() => import('./pages/Login'));
@@ -39,18 +40,22 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="documents" element={<Documents />} />
               <Route path="batch-upload" element={<BatchUpload />} />
-              <Route path="processing-pipeline" element={<ProcessingPipeline />} />
-              <Route path="workflows" element={<Workflows />} />
               <Route path="entities" element={<Entities />} />
-              <Route path="analytics" element={<Analytics />} />
               <Route path="chat" element={<Chat />} />
               <Route path="search" element={<Search />} />
-              <Route path="mcp-tools" element={<MCPTools />} />
-              <Route path="api-keys" element={<ApiKeys />} />
-              <Route path="webhooks" element={<Webhooks />} />
-              <Route path="audit-logs" element={<AuditLogs />} />
-              <Route path="admin" element={<Admin />} />
               <Route path="settings" element={<Settings />} />
+              
+              {/* Admin/Developer only routes */}
+              <Route path="processing-pipeline" element={<ProtectedRoute requiredRoute="/processing-pipeline"><ProcessingPipeline /></ProtectedRoute>} />
+              <Route path="workflows" element={<ProtectedRoute requiredRoute="/workflows"><Workflows /></ProtectedRoute>} />
+              <Route path="analytics" element={<ProtectedRoute requiredRoute="/analytics"><Analytics /></ProtectedRoute>} />
+              <Route path="mcp-tools" element={<ProtectedRoute requiredRoute="/mcp-tools"><MCPTools /></ProtectedRoute>} />
+              <Route path="api-keys" element={<ProtectedRoute requiredRoute="/api-keys"><ApiKeys /></ProtectedRoute>} />
+              <Route path="webhooks" element={<ProtectedRoute requiredRoute="/webhooks"><Webhooks /></ProtectedRoute>} />
+              <Route path="audit-logs" element={<ProtectedRoute requiredRoute="/audit-logs"><AuditLogs /></ProtectedRoute>} />
+              
+              {/* Admin only route */}
+              <Route path="admin" element={<ProtectedRoute requiredRoute="/admin"><Admin /></ProtectedRoute>} />
             </Route>
           ) : (
             <Route path="*" element={<Navigate to="/login" />} />

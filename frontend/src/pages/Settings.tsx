@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
+import { useAuth } from '../hooks/useAuth';
+import { hasPermission } from '../utils/roleUtils';
 
 export default function Settings() {
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [autoProcess, setAutoProcess] = useState(true);
+  const { user } = useAuth();
+  
+  const canViewSensitive = user ? hasPermission(user.role, 'viewSensitiveData') : false;
+  const canConfigureWebhooks = user ? hasPermission(user.role, 'configureWebhooks') : false;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -96,60 +102,70 @@ export default function Settings() {
         </div>
       </Card>
 
-      <Card title="API Configuration">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">API Endpoint</label>
-            <input 
-              type="text" 
-              defaultValue="http://localhost:8003"
-              className="w-full px-3 py-2 border rounded-lg font-mono text-sm" 
-            />
+      {canConfigureWebhooks && (
+        <Card title="API Configuration">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">API Endpoint</label>
+              <input 
+                type="text" 
+                defaultValue="http://localhost:8003"
+                className="w-full px-3 py-2 border rounded-lg font-mono text-sm" 
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Webhook URL</label>
+              <input 
+                type="text" 
+                placeholder="https://your-domain.com/webhook"
+                className="w-full px-3 py-2 border rounded-lg font-mono text-sm" 
+              />
+            </div>
+            
+            <Button variant="secondary">Test Connection</Button>
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-1">Webhook URL</label>
-            <input 
-              type="text" 
-              placeholder="https://your-domain.com/webhook"
-              className="w-full px-3 py-2 border rounded-lg font-mono text-sm" 
-            />
-          </div>
-          
-          <Button variant="secondary">Test Connection</Button>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <Card title="Data & Privacy">
         <div className="space-y-3">
           <Button variant="secondary" className="w-full">
-            Export Data
+            Export My Data
           </Button>
           <Button variant="secondary" className="w-full">
-            Download Activity Log
+            Download My Activity Log
           </Button>
-          <Button variant="danger" className="w-full">
-            Delete Account
-          </Button>
+          {canViewSensitive && (
+            <Button variant="danger" className="w-full">
+              Delete Account
+            </Button>
+          )}
         </div>
       </Card>
 
-      <Card title="About">
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Version</span>
-            <span className="font-medium">2.0.0</span>
+      {canViewSensitive && (
+        <Card title="System Information">
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Version</span>
+              <span className="font-medium">2.0.0</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">API Version</span>
+              <span className="font-medium">v1</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Environment</span>
+              <span className="font-medium">Development</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">User Role</span>
+              <span className="font-medium capitalize">{user?.role}</span>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">API Version</span>
-            <span className="font-medium">v1</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Environment</span>
-            <span className="font-medium">Development</span>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }

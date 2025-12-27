@@ -5,12 +5,17 @@ import MetricCard from '../components/dashboard/MetricCard';
 import Card from '../components/common/Card';
 import Chart from '../components/analytics/Chart';
 import Button from '../components/common/Button';
+import { useAuth } from '../hooks/useAuth';
+import { hasPermission } from '../utils/roleUtils';
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState<any>(null);
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  const canViewMetrics = user ? hasPermission(user.role, 'viewSystemMetrics') : false;
 
   useEffect(() => {
     loadData();
@@ -54,35 +59,56 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard 
-          title="Automation Rate" 
-          value={`${metrics?.automationRate || 0}%`}
-          change={12}
-          icon="🤖"
-        />
-        <MetricCard 
-          title="Documents Processed" 
-          value={metrics?.totalProcessed || 0}
-          change={8}
+          title="My Documents" 
+          value={recentDocs.length}
+          change={0}
           icon="📄"
         />
         <MetricCard 
-          title="Active Workflows" 
-          value="12"
-          change={-3}
-          icon="⚙️"
+          title="Completed" 
+          value={recentDocs.filter(d => d.status === 'completed').length}
+          change={0}
+          icon="✅"
         />
-        <MetricCard 
-          title="API Calls Today" 
-          value="2,847"
-          change={15}
-          icon="📊"
-        />
+        {canViewMetrics && (
+          <>
+            <MetricCard 
+              title="Automation Rate" 
+              value={`${metrics?.automationRate || 0}%`}
+              change={12}
+              icon="🤖"
+            />
+            <MetricCard 
+              title="API Calls Today" 
+              value="2,847"
+              change={15}
+              icon="📊"
+            />
+          </>
+        )}
+        {!canViewMetrics && (
+          <>
+            <MetricCard 
+              title="Processing" 
+              value={recentDocs.filter(d => d.status === 'processing').length}
+              change={0}
+              icon="⏳"
+            />
+            <MetricCard 
+              title="Upload" 
+              value="Upload New"
+              icon="⬆️"
+            />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Processing Trend">
-          <Chart data={processingTrend} />
-        </Card>
+        {canViewMetrics && (
+          <Card title="Processing Trend">
+            <Chart data={processingTrend} />
+          </Card>
+        )}
 
         <Card title="Recent Documents">
           <div className="space-y-3">
