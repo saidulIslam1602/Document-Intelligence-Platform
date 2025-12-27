@@ -744,7 +744,8 @@ SERVICE_ENDPOINTS = {
     "migration-service": "http://localhost:8009",
     "fabric-integration": "http://localhost:8010",
     "demo-service": "http://localhost:8011",
-    "mcp-server": "http://localhost:8012"
+    "mcp-server": "http://localhost:8012",
+    "m365-integration": "http://localhost:8013"
 }
 
 # Rate limiting configuration
@@ -1154,6 +1155,11 @@ async def route_quality_requests(request: Request, path: str):
 async def route_llmops_requests(request: Request, path: str):
     """Route requests to AI processing service for LLMOps"""
     return await route_request(request, "ai-processing", f"/llmops/{path}")
+
+@app.api_route("/m365/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def route_m365_requests(request: Request, path: str):
+    """Route requests to M365 integration service"""
+    return await route_request(request, "m365-integration", f"/m365/{path}")
 
 # Login/Register request models
 class LoginRequest(BaseModel):
