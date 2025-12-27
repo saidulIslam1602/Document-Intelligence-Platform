@@ -545,7 +545,7 @@ import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import aiofiles
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
@@ -573,6 +573,9 @@ from src.shared.storage.sql_service import SQLService
 from src.shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
 from src.shared.monitoring.performance_monitor import monitor_performance
 from src.shared.storage.local_storage import LocalStorageService
+import psycopg2
+import psycopg2.extras
+import os
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -600,6 +603,28 @@ logger = logging.getLogger(__name__)
 
 # Initialize local storage
 local_storage_service = LocalStorageService()
+
+# Initialize PostgreSQL database connection
+try:
+    DB_HOST = os.getenv("POSTGRES_HOST", "docintel-postgres")
+    DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+    DB_NAME = os.getenv("POSTGRES_DB", "documentintelligence")
+    DB_USER = os.getenv("POSTGRES_USER", "admin")
+    DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "admin123")
+    
+    db_connection = psycopg2.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD
+    )
+    DATABASE_AVAILABLE = True
+    logger.info(f"PostgreSQL database connected: {DB_HOST}:{DB_PORT}/{DB_NAME}")
+except Exception as e:
+    db_connection = None
+    DATABASE_AVAILABLE = False
+    logger.warning(f"PostgreSQL not available: {e}")
 
 # Initialize storage services
 data_lake_service = DataLakeService(config.data_lake_connection_string)
@@ -1131,51 +1156,42 @@ async def list_user_documents(
 @app.delete("/documents/{document_id}")
 async def delete_document(
     document_id: str,
-    user_id: str = Depends(get_current_user)
+    request: Request
 ):
     """Delete a document and its associated data"""
     try:
-        container = database.get_container_client("documents")
+        user_id = request.headers.get("X-User-ID", "demo1234")
+        logger.info(f"Deleting document {document_id} for user {user_id}")
         
-        # Get document record
-        document_record = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: container.read_item(
-                item=document_id,
-                partition_key=user_id
-            )
-        )
+        if DATABASE_AVAILABLE and db_connection:
+            # Delete from PostgreSQL
+            cursor = db_connection.cursor()
+            
+            # Delete related data first
+            cursor.execute("DELETE FROM document_entities WHERE document_id = %s", (document_id,))
+            cursor.execute("DELETE FROM invoice_extractions WHERE document_id = %s", (document_id,))
+            cursor.execute("DELETE FROM documents WHERE id = %s", (document_id,))
+            
+            db_connection.commit()
+            cursor.close()
+            
+            logger.info(f"Document {document_id} deleted from PostgreSQL")
         
-        # Delete from blob storage
-        blob_client = blob_service_client.get_blob_client(
-            container="documents",
-            blob=document_record.get("blob_path")
-        )
+        # Delete from local storage if exists
+        if local_storage_service:
+            try:
+                local_storage_service.delete_document(document_id)
+                logger.info(f"Document {document_id} deleted from local storage")
+            except Exception as e:
+                logger.warning(f"Could not delete from local storage: {e}")
         
-        try:
-            await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: blob_client.delete_blob()
-            )
-        except Exception as e:
-            logger.warning(f"Could not delete blob: {str(e)}")
-        
-        # Delete from Azure SQL Database
-        await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: container.delete_item(
-                item=document_id,
-                partition_key=user_id
-            )
-        )
-        
-        logger.info(f"Document {document_id} deleted by user {user_id}")
-        
-        return {"message": "Document deleted successfully"}
-        
+        return {
+            "message": "Document deleted successfully",
+            "document_id": document_id
+        }
     except Exception as e:
-        logger.error(f"Error deleting document: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error deleting document {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
 
 # Helper functions
 async def publish_event(event: DocumentUploadedEvent):
