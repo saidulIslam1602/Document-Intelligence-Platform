@@ -701,19 +701,27 @@ security_config = config_manager.get_security_config()
 logger = logging.getLogger(__name__)
 
 # Redis configuration from environment variables
-REDIS_HOST = os.getenv('REDIS_HOST', 'redis')  # Default to 'redis' for Docker, not 'localhost'
-REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
+REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')  # Default to 'localhost' for local dev
+REDIS_PORT = int(os.getenv('REDIS_PORT', '6382'))   # Local Redis port
 REDIS_DB = int(os.getenv('REDIS_DB', '0'))
 
 # Redis client for rate limiting and caching
-redis_client = redis.Redis(
-    host=REDIS_HOST, 
-    port=REDIS_PORT, 
-    db=REDIS_DB, 
-    decode_responses=True,
-    socket_connect_timeout=5,
-    socket_timeout=5
-)
+try:
+    redis_client = redis.Redis(
+        host=REDIS_HOST, 
+        port=REDIS_PORT, 
+        db=REDIS_DB, 
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=5
+    )
+    # Test connection
+    redis_client.ping()
+    logger.info(f"Redis connected successfully at {REDIS_HOST}:{REDIS_PORT}")
+except Exception as e:
+    logger.warning(f"Redis connection failed: {e}")
+    logger.warning("Rate limiting and caching will be degraded")
+    redis_client = None
 
 # Key Vault client for secrets
 if config.key_vault_url and config.key_vault_url.startswith("https://"):
@@ -857,7 +865,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     rate_limit = limit
                     break
             
-            # Check current count
+            # Check current count (skip if Redis unavailable)
+            if not redis_client:
+                return True  # Allow request if Redis is down
+            
             current_count = redis_client.get(key)
             if current_count is None:
                 # First request in window
@@ -1638,8 +1649,9 @@ async def logout(current_token: str = Depends(security)):
     """User logout endpoint"""
     try:
         # Add token to blacklist (in production, this would be stored in Redis)
-        token_hash = hashlib.sha256(current_token.credentials.encode()).hexdigest()
-        redis_client.setex(f"blacklist:{token_hash}", 3600, "true")
+        if redis_client:
+            token_hash = hashlib.sha256(current_token.credentials.encode()).hexdigest()
+            redis_client.setex(f"blacklist:{token_hash}", 3600, "true")
         
         return {"message": "Logged out successfully"}
         
@@ -1760,11 +1772,14 @@ async def get_rate_limit_info(request: Request):
         rate_limit_key = f"rate_limit:{client_ip}:{request.url.path}"
         
         # Get current count
-        current_count = redis_client.get(rate_limit_key)
-        if current_count is None:
-            current_count = 0
+        if redis_client:
+            current_count = redis_client.get(rate_limit_key)
+            if current_count is None:
+                current_count = 0
+            else:
+                current_count = int(current_count)
         else:
-            current_count = int(current_count)
+            current_count = 0
         
         # Get rate limit configuration
         rate_limit = RATE_LIMITS.get("default")
@@ -1774,7 +1789,7 @@ async def get_rate_limit_info(request: Request):
                 break
         
         # Calculate reset time
-        ttl = redis_client.ttl(rate_limit_key)
+        ttl = redis_client.ttl(rate_limit_key) if redis_client else 3600
         reset_time = int(time.time()) + ttl if ttl > 0 else int(time.time()) + rate_limit["window"]
         
         return RateLimitInfo(
@@ -1889,9 +1904,10 @@ async def validate_token(token: str) -> Optional[User]:
     """Validate JWT token"""
     try:
         # Check if token is blacklisted
-        token_hash = hashlib.sha256(token.encode()).hexdigest()
-        if redis_client.get(f"blacklist:{token_hash}"):
-            return None
+        if redis_client:
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+            if redis_client.get(f"blacklist:{token_hash}"):
+                return None
         
         # Decode token
         payload = jwt.decode(token, security_config.jwt_secret_key, algorithms=["HS256"])
@@ -1939,11 +1955,12 @@ async def store_api_key(api_key_record: APIKey, api_key: str):
         }
         
         # Store in Redis (in production, use a proper database)
-        redis_client.setex(
-            f"api_key:{api_key_record.key_id}",
-            86400 * 365,  # 1 year
-            json.dumps(key_data)
-        )
+        if redis_client:
+            redis_client.setex(
+                f"api_key:{api_key_record.key_id}",
+                86400 * 365,  # 1 year
+                json.dumps(key_data)
+            )
         
     except Exception as e:
         logger.error(f"Error storing API key: {str(e)}")
@@ -1964,7 +1981,8 @@ async def revoke_api_key_by_id(key_id: str, user_id: str):
     """Revoke an API key by ID"""
     try:
         # In production, this would update the database
-        redis_client.delete(f"api_key:{key_id}")
+        if redis_client:
+            redis_client.delete(f"api_key:{key_id}")
         logger.info(f"API key {key_id} revoked for user {user_id}")
         
     except Exception as e:
@@ -1978,18 +1996,20 @@ async def startup_event():
     logger.info("API Gateway Service started")
     
     # Test Redis connection
-    try:
-        redis_client.ping()
-        logger.info("Redis connection established")
-    except Exception as e:
-        logger.error(f"Redis connection failed: {str(e)}")
+    if redis_client:
+        try:
+            redis_client.ping()
+            logger.info("Redis connection established on startup")
+        except Exception as e:
+            logger.error(f"Redis connection failed: {str(e)}")
 
 # Shutdown event
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info("API Gateway Service shutting down")
-    redis_client.close()
+    if redis_client:
+        redis_client.close()
 
 if __name__ == "__main__":
     import uvicorn
