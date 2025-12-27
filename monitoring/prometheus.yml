@@ -1,111 +1,65 @@
+# Prometheus configuration for monitoring all services
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
     cluster: 'document-intelligence-platform'
-    environment: 'development'
+    environment: 'production'
 
-# Alertmanager configuration (optional)
-# alerting:
-#   alertmanagers:
-#     - static_configs:
-#         - targets:
-#           - 'alertmanager:9093'
-
-# Load rules once and periodically evaluate them
-# rule_files:
-#   - "alert_rules.yml"
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
 
 # Scrape configurations
 scrape_configs:
-  # Prometheus itself
-  - job_name: 'prometheus'
+  # API Gateway metrics
+  - job_name: 'api-gateway'
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ['api-gateway:8003']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
 
   # Document Ingestion Service
   - job_name: 'document-ingestion'
-    metrics_path: '/metrics'
     static_configs:
       - targets: ['document-ingestion:8000']
-        labels:
-          service: 'document-ingestion'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
 
   # AI Processing Service
   - job_name: 'ai-processing'
-    metrics_path: '/metrics'
     static_configs:
       - targets: ['ai-processing:8001']
-        labels:
-          service: 'ai-processing'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
 
   # Analytics Service
   - job_name: 'analytics'
-    metrics_path: '/metrics'
     static_configs:
       - targets: ['analytics:8002']
-        labels:
-          service: 'analytics'
-
-  # API Gateway
-  - job_name: 'api-gateway'
     metrics_path: '/metrics'
-    static_configs:
-      - targets: ['api-gateway:8003']
-        labels:
-          service: 'api-gateway'
+    scrape_interval: 15s
 
-  # AI Chat Service
-  - job_name: 'ai-chat'
+  # MCP Server
+  - job_name: 'mcp-server'
+    static_configs:
+      - targets: ['mcp-server:8012']
     metrics_path: '/metrics'
-    static_configs:
-      - targets: ['ai-chat:8004']
-        labels:
-          service: 'ai-chat'
+    scrape_interval: 15s
 
-  # Performance Dashboard
-  - job_name: 'performance-dashboard'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['performance-dashboard:8005']
-        labels:
-          service: 'performance-dashboard'
-
-  # Data Quality Service
-  - job_name: 'data-quality'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['data-quality:8006']
-        labels:
-          service: 'data-quality'
-
-  # Batch Processor
-  - job_name: 'batch-processor'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['batch-processor:8007']
-        labels:
-          service: 'batch-processor'
-
-  # Data Catalog
-  - job_name: 'data-catalog'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['data-catalog:8008']
-        labels:
-          service: 'data-catalog'
-
-  # Redis
+  # Redis monitoring
   - job_name: 'redis'
     static_configs:
       - targets: ['redis:6379']
-        labels:
-          service: 'redis'
 
-  # Nginx
-  - job_name: 'nginx'
-    metrics_path: '/metrics'
+  # PostgreSQL monitoring
+  - job_name: 'postgres'
     static_configs:
-      - targets: ['nginx:80']
-        labels:
-          service: 'nginx'
+      - targets: ['postgres:5432']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

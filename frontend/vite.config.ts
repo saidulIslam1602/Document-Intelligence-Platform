@@ -29,7 +29,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false, // Disabled for production
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info'],
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks: {
@@ -37,8 +45,14 @@ export default defineConfig({
           'chart-vendor': ['chart.js', 'react-chartjs-2', 'recharts'],
           'ui-vendor': ['@headlessui/react', '@heroicons/react', 'framer-motion'],
         },
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
       },
     },
+    chunkSizeWarningLimit: 1000,
+    cssCodeSplit: true,
+    reportCompressedSize: false, // Faster builds
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom'],

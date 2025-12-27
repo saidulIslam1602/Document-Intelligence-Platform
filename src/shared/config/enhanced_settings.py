@@ -506,6 +506,7 @@ class RedisSettings(BaseSettings):
     
     class Config:
         env_prefix = "REDIS_"
+        extra = "ignore"
         env_file = ".env"
         case_sensitive = False
 
@@ -521,6 +522,7 @@ class DatabaseSettings(BaseSettings):
     
     class Config:
         env_prefix = "DB_"
+        extra = "ignore"
         env_file = ".env"
 
 
@@ -535,6 +537,7 @@ class FormRecognizerSettings(BaseSettings):
     
     class Config:
         env_prefix = "FORM_RECOGNIZER_"
+        extra = "ignore"
         env_file = ".env"
 
 
@@ -549,6 +552,7 @@ class AutomationSettings(BaseSettings):
     
     class Config:
         env_prefix = "AUTOMATION_"
+        extra = "ignore"
         env_file = ".env"
 
 
@@ -582,6 +586,7 @@ class PerformanceSettings(BaseSettings):
     class Config:
         env_prefix = "PERF_"
         env_file = ".env"
+        extra = "ignore"
 
 
 class CircuitBreakerSettings(BaseSettings):
@@ -594,6 +599,7 @@ class CircuitBreakerSettings(BaseSettings):
     class Config:
         env_prefix = "CIRCUIT_BREAKER_"
         env_file = ".env"
+        extra = "ignore"
 
 
 class RetrySettings(BaseSettings):
@@ -607,6 +613,7 @@ class RetrySettings(BaseSettings):
     class Config:
         env_prefix = "RETRY_"
         env_file = ".env"
+        extra = "ignore"
 
 
 class ObservabilitySettings(BaseSettings):
@@ -620,6 +627,7 @@ class ObservabilitySettings(BaseSettings):
     class Config:
         env_prefix = "OBSERVABILITY_"
         env_file = ".env"
+        extra = "ignore"
 
 
 class ServiceSettings(BaseSettings):
@@ -633,6 +641,7 @@ class ServiceSettings(BaseSettings):
     class Config:
         env_prefix = "SERVICE_"
         env_file = ".env"
+        extra = "ignore"
 
 
 class AppSettings(BaseSettings):
@@ -667,6 +676,7 @@ class AppSettings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"
     
     def is_production(self) -> bool:
         """Check if running in production"""

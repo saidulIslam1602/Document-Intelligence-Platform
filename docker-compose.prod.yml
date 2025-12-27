@@ -1,0 +1,333 @@
+version: '3.8'
+
+# Production-optimized Docker Compose with resource limits and cost optimization
+services:
+  # Redis - Caching and Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: di-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # PostgreSQL - Primary Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: di-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-documentintelligence}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+      # Performance tuning
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_WORK_MEM: 16MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 128MB
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Frontend - React SPA
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: di-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: src/microservices/api-gateway/Dockerfile.prod
+    container_name: di-api-gateway
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SQL_CONNECTION_STRING=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-documentintelligence}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-in-production}
+      - PYTHONUNBUFFERED=1
+      - WORKERS=4
+    ports:
+      - "8003:8003"
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      replicas: 2  # For load balancing
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Document Ingestion Service
+  document-ingestion:
+    build:
+      context: .
+      dockerfile: src/microservices/document-ingestion/Dockerfile
+    container_name: di-document-ingestion
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_HOST=redis
+      - SQL_CONNECTION_STRING=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-documentintelligence}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Processing Service
+  ai-processing:
+    build:
+      context: .
+      dockerfile: src/microservices/ai-processing/Dockerfile
+    container_name: di-ai-processing
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_HOST=redis
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FORM_RECOGNIZER_ENDPOINT=${FORM_RECOGNIZER_ENDPOINT}
+      - FORM_RECOGNIZER_KEY=${FORM_RECOGNIZER_KEY}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8001:8001"
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Analytics Service
+  analytics:
+    build:
+      context: .
+      dockerfile: src/microservices/analytics/Dockerfile
+    container_name: di-analytics
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_HOST=redis
+      - SQL_CONNECTION_STRING=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-documentintelligence}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8002:8002"
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MCP Server
+  mcp-server:
+    build:
+      context: .
+      dockerfile: src/microservices/mcp-server/Dockerfile
+    container_name: di-mcp-server
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_HOST=redis
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-in-production}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8012:8012"
+    depends_on:
+      - redis
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8012/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: di-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Grafana - Metrics Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: di-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=redis-datasource
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - di-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+networks:
+  di-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+

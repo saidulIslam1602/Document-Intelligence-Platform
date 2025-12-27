@@ -6,7 +6,7 @@ Implements token bucket algorithm for rate limiting MCP tool executions
 import asyncio
 import logging
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from datetime import datetime, timedelta
 from fastapi import HTTPException, Request
 import redis.asyncio as redis
