@@ -651,6 +651,7 @@ import os
 import time
 import hashlib
 import jwt
+import psycopg2.extras
 from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends, Request, Response, status
@@ -1456,6 +1457,119 @@ async def route_document_requests(request: Request, path: str):
 async def route_processing_requests(request: Request, path: str):
     """Route requests to AI processing service"""
     return await route_request(request, "ai-processing", f"/process/{path}")
+
+@app.get("/entities")
+async def get_entities(limit: int = 100, offset: int = 0, entity_type: Optional[str] = None):
+    """Get extracted entities from all documents"""
+    logger.info(f"Fetching entities with limit={limit}, offset={offset}, type={entity_type}")
+    
+    if DATABASE_AVAILABLE:
+        try:
+            conn = db.get_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Build query
+            query = """
+                SELECT 
+                    e.id,
+                    e.document_id,
+                    d.filename,
+                    e.entity_type,
+                    e.entity_value,
+                    e.confidence_score,
+                    e.extracted_at
+                FROM document_entities e
+                JOIN documents d ON e.document_id = d.id
+                WHERE 1=1
+            """
+            params = []
+            
+            if entity_type:
+                query += " AND e.entity_type = %s"
+                params.append(entity_type)
+            
+            query += " ORDER BY e.extracted_at DESC LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+            
+            cursor.execute(query, params)
+            entities = cursor.fetchall()
+            
+            # Get total count
+            count_query = "SELECT COUNT(*) FROM document_entities WHERE 1=1"
+            count_params = []
+            if entity_type:
+                count_query += " AND entity_type = %s"
+                count_params.append(entity_type)
+            
+            cursor.execute(count_query, count_params)
+            total = cursor.fetchone()[0]
+            
+            cursor.close()
+            conn.close()
+            
+            # Convert to list of dicts and format dates
+            entities_list = []
+            for entity in entities:
+                entity_dict = dict(entity)
+                if entity_dict.get('extracted_at'):
+                    entity_dict['extracted_at'] = entity_dict['extracted_at'].isoformat() + "Z"
+                if entity_dict.get('confidence_score') is not None:
+                    entity_dict['confidence_score'] = float(entity_dict['confidence_score'])
+                entities_list.append(entity_dict)
+            
+            return {
+                "entities": entities_list,
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "entity_type": entity_type
+            }
+        except Exception as e:
+            logger.error(f"Failed to fetch entities: {e}")
+            return {
+                "entities": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+                "error": str(e)
+            }
+    else:
+        # Mock entities for when database is not available
+        return {
+            "entities": [
+                {
+                    "id": 1,
+                    "document_id": "doc1",
+                    "filename": "Sample Invoice.pdf",
+                    "entity_type": "organization",
+                    "entity_value": "Acme Corporation",
+                    "confidence_score": 0.98,
+                    "extracted_at": datetime.utcnow().isoformat() + "Z"
+                },
+                {
+                    "id": 2,
+                    "document_id": "doc1",
+                    "filename": "Sample Invoice.pdf",
+                    "entity_type": "money",
+                    "entity_value": "$1,250.00",
+                    "confidence_score": 0.97,
+                    "extracted_at": datetime.utcnow().isoformat() + "Z"
+                },
+                {
+                    "id": 3,
+                    "document_id": "doc2",
+                    "filename": "Receipt.jpg",
+                    "entity_type": "organization",
+                    "entity_value": "Coffee Shop",
+                    "confidence_score": 0.94,
+                    "extracted_at": datetime.utcnow().isoformat() + "Z"
+                }
+            ],
+            "total": 3,
+            "limit": limit,
+            "offset": offset,
+            "entity_type": entity_type
+        }
 
 @app.get("/analytics/automation-metrics")
 async def get_automation_metrics():
