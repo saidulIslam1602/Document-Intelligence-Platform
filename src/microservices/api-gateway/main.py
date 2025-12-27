@@ -1304,42 +1304,36 @@ async def get_document_details(document_id: str):
         raise HTTPException(status_code=404, detail="Document not found")
 
 @app.post("/documents/upload")
-async def upload_document(request: Request):
-    """Upload a document with industry-standard invoice extraction"""
+async def upload_document(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id),
+    document_type: Optional[str] = Form(None),
+    metadata: Optional[str] = Form(None)
+):
+    """Upload a document for AI processing with OCR"""
     try:
-        # Parse multipart form data
-        form = await request.form()
-        file = form.get("file")
+        logger.info(f"API Gateway: Uploading {file.filename} to document-ingestion service")
         
-        if not file:
-            raise HTTPException(status_code=400, detail="No file provided")
+        # Forward to document-ingestion service for real AI processing
+        files = {"file": (file.filename, await file.read(), file.content_type)}
+        data = {
+            "user_id": user_id,
+            "document_type": document_type or "unknown",
+            "metadata": metadata or "{}"
+        }
         
-        # Generate document ID and extract file info
-        doc_id = f"doc_{hashlib.md5(str(datetime.utcnow()).encode()).hexdigest()[:8]}"
-        filename = file.filename if hasattr(file, 'filename') else "unknown"
-        file_size = file.size if hasattr(file, 'size') else 0
-        file_ext = filename.split('.')[-1].lower() if '.' in filename else 'txt'
-        
-        # Determine document type
-        doc_type = "invoice" if "invoice" in filename.lower() else "receipt" if "receipt" in filename.lower() else "document"
-        
-        # Generate confidence score
-        confidence = 0.85 + (hash(filename) % 15) / 100
-        
-        if DATABASE_AVAILABLE:
-            # Store in PostgreSQL
-            document_data = {
-                "id": doc_id,
-                "filename": filename,
-                "file_type": file_ext,
-                "document_type": doc_type,
-                "status": "processed",
-                "file_size": file_size,
-                "user_id": "demo1234",
-                "confidence_score": confidence
-            }
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"http://{DOCUMENT_INGESTION_SERVICE}/documents/upload",
+                files=files,
+                data=data,
+                timeout=60.0
+            )
+            response.raise_for_status()
+            result = response.json()
             
-            db.insert_document(document_data)
+            logger.info(f"Document {result.get('document_id')} uploaded and queued for AI processing")
+            return result
             
             # Generate industry-standard invoice extraction
             invoice_hash = hash(filename)
