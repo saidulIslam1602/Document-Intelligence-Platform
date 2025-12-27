@@ -1305,8 +1305,12 @@ async def get_document_details(document_id: str):
 
 @app.post("/documents/upload")
 async def upload_document(request: Request):
-    """Upload a document with industry-standard invoice extraction"""
+    """Upload a document and forward to document ingestion service for AI processing"""
     try:
+        # Get user_id from auth header or use demo user
+        auth_header = request.headers.get("Authorization", "")
+        user_id = "demo1234"  # Default for demo
+        
         # Parse multipart form data
         form = await request.form()
         file = form.get("file")
@@ -1314,143 +1318,28 @@ async def upload_document(request: Request):
         if not file:
             raise HTTPException(status_code=400, detail="No file provided")
         
-        # Generate document ID and extract file info
-        doc_id = f"doc_{hashlib.md5(str(datetime.utcnow()).encode()).hexdigest()[:8]}"
         filename = file.filename if hasattr(file, 'filename') else "unknown"
-        file_size = file.size if hasattr(file, 'size') else 0
-        file_ext = filename.split('.')[-1].lower() if '.' in filename else 'txt'
+        logger.info(f"API Gateway: Uploading document {filename} for user {user_id}")
         
-        # Determine document type
-        doc_type = "invoice" if "invoice" in filename.lower() else "receipt" if "receipt" in filename.lower() else "document"
+        # Read file content
+        file_content = await file.read()
         
-        # Generate confidence score
-        confidence = 0.85 + (hash(filename) % 15) / 100
-        
-        if DATABASE_AVAILABLE:
-            # Store in PostgreSQL
-            document_data = {
-                "id": doc_id,
-                "filename": filename,
-                "file_type": file_ext,
-                "document_type": doc_type,
-                "status": "processed",
-                "file_size": file_size,
-                "user_id": "demo1234",
-                "confidence_score": confidence
-            }
-            
-            db.insert_document(document_data)
-            
-            # Generate industry-standard invoice extraction
-            invoice_hash = hash(filename)
-            invoice_num = abs(invoice_hash) % 100000
-            vendor_id = abs(invoice_hash) % 20
-            
-            vendors = [
-                {"name": "Acme Corporation", "address": "123 Business St, New York, NY 10001", "tax_id": "12-3456789", "email": "billing@acme.com", "phone": "+1-555-0100"},
-                {"name": "Global Supplies Inc", "address": "456 Commerce Ave, Chicago, IL 60601", "tax_id": "98-7654321", "email": "ap@globalsupplies.com", "phone": "+1-555-0200"},
-                {"name": "Tech Solutions LLC", "address": "789 Innovation Dr, San Francisco, CA 94102", "tax_id": "45-6789012", "email": "invoices@techsolutions.com", "phone": "+1-555-0300"},
-                {"name": "Office Essentials Co", "address": "321 Supply Blvd, Boston, MA 02101", "tax_id": "34-5678901", "email": "billing@officeessentials.com", "phone": "+1-555-0400"},
-                {"name": "Industrial Parts Ltd", "address": "654 Factory Ln, Detroit, MI 48201", "tax_id": "23-4567890", "email": "accounts@industrialparts.com", "phone": "+1-555-0500"},
-                {"name": "Professional Services Corp", "address": "987 Consultant Way, Seattle, WA 98101", "tax_id": "12-0987654", "email": "finance@proservices.com", "phone": "+1-555-0600"},
-                {"name": "Wholesale Distributors", "address": "147 Warehouse Rd, Miami, FL 33101", "tax_id": "89-0123456", "email": "billing@wholesale.com", "phone": "+1-555-0700"},
-                {"name": "Premium Products Inc", "address": "258 Quality St, Denver, CO 80201", "tax_id": "67-8901234", "email": "ap@premiumproducts.com", "phone": "+1-555-0800"},
-                {"name": "Enterprise Solutions", "address": "369 Corporate Plaza, Atlanta, GA 30301", "tax_id": "56-7890123", "email": "invoicing@enterprise.com", "phone": "+1-555-0900"},
-                {"name": "Advanced Technologies", "address": "741 Tech Park, Austin, TX 78701", "tax_id": "45-6789012", "email": "billing@advtech.com", "phone": "+1-555-1000"},
-            ]
-            
-            vendor = vendors[vendor_id % len(vendors)]
-            
-            # Calculate realistic invoice amounts
-            subtotal = round(500 + (abs(invoice_hash) % 5000), 2)
-            tax_rate = 8.5
-            tax_amount = round(subtotal * tax_rate / 100, 2)
-            shipping = round(15 + (abs(invoice_hash) % 50), 2) if invoice_hash % 3 == 0 else 0
-            discount = round(subtotal * 0.05, 2) if invoice_hash % 5 == 0 else 0
-            total = round(subtotal + tax_amount + shipping - discount, 2)
-            
-            # Generate line items
-            num_items = 1 + (abs(invoice_hash) % 5)
-            line_items = []
-            remaining_subtotal = subtotal
-            
-            for i in range(num_items):
-                item_amount = round(remaining_subtotal / (num_items - i), 2) if i < num_items - 1 else remaining_subtotal
-                quantity = 1 + (abs(invoice_hash >> i) % 10)
-                unit_price = round(item_amount / quantity, 2)
-                
-                line_items.append({
-                    "line_number": i + 1,
-                    "description": f"Professional Services - Category {chr(65 + (i % 26))}",
-                    "quantity": quantity,
-                    "unit_price": float(unit_price),
-                    "amount": float(item_amount),
-                    "tax_rate": tax_rate,
-                    "tax_amount": round(item_amount * tax_rate / 100, 2)
-                })
-                remaining_subtotal -= item_amount
-            
-            # Invoice dates
-            invoice_date = (datetime.utcnow() - timedelta(days=abs(invoice_hash) % 30)).date()
-            due_date = invoice_date + timedelta(days=30)
-            
-            extraction_data = {
-                "document_id": doc_id,
-                "invoice_number": f"INV-{datetime.utcnow().year}-{invoice_num:05d}",
-                "invoice_date": invoice_date,
-                "due_date": due_date,
-                "purchase_order_number": f"PO-{abs(invoice_hash) % 10000:04d}" if invoice_hash % 3 == 0 else None,
-                "vendor_name": vendor["name"],
-                "vendor_address": vendor["address"],
-                "vendor_tax_id": vendor["tax_id"],
-                "vendor_email": vendor["email"],
-                "vendor_phone": vendor["phone"],
-                "customer_name": "Your Company Inc",
-                "customer_address": "100 Main Street, Anytown, ST 12345",
-                "customer_tax_id": "98-7654321",
-                "currency_code": "USD",
-                "subtotal": subtotal,
-                "tax_amount": tax_amount,
-                "discount_amount": discount,
-                "shipping_amount": shipping,
-                "total_amount": total,
-                "amount_paid": 0,
-                "balance_due": total,
-                "tax_rate": tax_rate,
-                "tax_type": "Sales Tax",
-                "payment_terms": "Net 30",
-                "payment_method": "Bank Transfer",
-                "bank_account_number": f"****{abs(invoice_hash) % 10000:04d}",
-                "bank_routing_number": "021000021",
-                "bank_name": "First National Bank",
-                "line_items": line_items,
-                "notes": "Thank you for your business",
-                "confidence_score": confidence
-            }
-            
-            db.insert_invoice_extraction(extraction_data)
-            
-            logger.info(f"Document uploaded to database: {filename} (ID: {doc_id})")
-        else:
-            # Fallback to in-memory storage
-            document_metadata = {
-                "id": doc_id,
-                "filename": filename,
-                "type": doc_type,
-                "status": "processed",
-                "uploaded_at": datetime.utcnow().isoformat() + "Z",
-                "size": file_size,
-                "confidence": confidence
-            }
-            uploaded_documents.append(document_metadata)
-        
-        return {
-            "document_id": doc_id,
-            "status": "uploaded",
-            "message": "Document uploaded and processed successfully",
-            "processing_status": "completed",
-            "filename": filename
-        }
+        # Forward to document ingestion service
+        async with httpx.AsyncClient() as client:
+            files = {"file": (filename, file_content, file.content_type if hasattr(file, 'content_type') else "application/octet-stream")}
+            response = await client.post(
+                "http://docintel-document-ingestion:8000/documents/upload",
+                files=files,
+                headers={"X-User-ID": user_id},
+                timeout=300.0  # 5 minutes for AI processing
+            )
+            response.raise_for_status()
+            result = response.json()
+            logger.info(f"Document {filename} uploaded successfully with ID: {result.get('document_id')}")
+            return result
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Document ingestion service error: {e.response.status_code} - {e.response.text}")
+        raise HTTPException(status_code=e.response.status_code, detail=f"Upload failed: {e.response.text}")
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
