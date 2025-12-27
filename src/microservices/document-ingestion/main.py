@@ -573,6 +573,7 @@ from src.shared.storage.sql_service import SQLService
 from src.shared.cache.redis_cache import cache_service, cache_result, cache_invalidate, CacheKeys
 from src.shared.monitoring.performance_monitor import monitor_performance
 from src.shared.storage.local_storage import LocalStorageService
+from src.shared.storage.database_service import PostgresDatabase
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -600,6 +601,16 @@ logger = logging.getLogger(__name__)
 
 # Initialize local storage
 local_storage_service = LocalStorageService()
+
+# Initialize PostgreSQL database
+try:
+    db = PostgresDatabase()
+    DATABASE_AVAILABLE = True
+    logger.info("PostgreSQL database initialized successfully")
+except Exception as e:
+    db = None
+    DATABASE_AVAILABLE = False
+    logger.warning(f"PostgreSQL not available: {e}")
 
 # Initialize storage services
 data_lake_service = DataLakeService(config.data_lake_connection_string)
