@@ -919,7 +919,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         # In development mode, also skip auth for API endpoints for easier testing
         environment = os.getenv("ENVIRONMENT", "development")
         if environment == "development":
-            public_path_prefixes.extend(["/entities", "/documents", "/analytics", "/process"])
+            public_path_prefixes.extend(["/entities", "/documents", "/analytics", "/process", "/workflows", "/chat", "/mcp", "/api-keys"])
         
         # Check if path matches exact paths or starts with allowed prefixes
         if request.url.path in public_paths or any(request.url.path.startswith(prefix) for prefix in public_path_prefixes):
@@ -1408,6 +1408,138 @@ async def delete_document(document_id: str, request: Request):
     except Exception as e:
         logger.error(f"Error deleting document: {str(e)}")
         raise HTTPException(status_code=500, detail="Delete failed")
+
+@app.post("/documents/batch-upload")
+async def batch_upload_documents(request: Request):
+    """Batch upload multiple documents"""
+    try:
+        form = await request.form()
+        files = form.getlist("files")
+        
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        results = []
+        async with httpx.AsyncClient() as client:
+            for file in files:
+                try:
+                    file_content = await file.read()
+                    filename = file.filename if hasattr(file, 'filename') else "unknown"
+                    files_data = {"file": (filename, file_content, file.content_type if hasattr(file, 'content_type') else "application/octet-stream")}
+                    
+                    response = await client.post(
+                        f"http://{DOCUMENT_INGESTION_SERVICE}/documents/upload",
+                        files=files_data,
+                        data={"user_id": "demo1234", "document_type": "invoice"},
+                        timeout=60.0
+                    )
+                    response.raise_for_status()
+                    results.append(response.json())
+                except Exception as e:
+                    logger.error(f"Failed to upload {filename}: {str(e)}")
+                    results.append({"filename": filename, "error": str(e), "status": "failed"})
+        
+        return {"documents": results, "total": len(results), "successful": len([r for r in results if "error" not in r])}
+    except Exception as e:
+        logger.error(f"Batch upload error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Batch upload failed: {str(e)}")
+
+@app.get("/documents/{document_id}/download")
+async def download_document(document_id: str):
+    """Download document file"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"http://{DOCUMENT_INGESTION_SERVICE}/documents/{document_id}/download",
+                timeout=60.0
+            )
+            response.raise_for_status()
+            return Response(content=response.content, media_type=response.headers.get("content-type", "application/octet-stream"))
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=e.response.status_code, detail="Download failed")
+    except Exception as e:
+        logger.error(f"Download error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Download failed")
+
+@app.post("/documents/{document_id}/reprocess")
+async def reprocess_document(document_id: str):
+    """Reprocess a document"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"http://{AI_PROCESSING_SERVICE}/process/reprocess/{document_id}",
+                timeout=60.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=e.response.status_code, detail="Reprocess failed")
+    except Exception as e:
+        logger.error(f"Reprocess error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Reprocess failed")
+
+@app.get("/documents/{document_id}/content")
+async def get_document_content(document_id: str):
+    """Get document extracted content"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"http://{DOCUMENT_INGESTION_SERVICE}/documents/{document_id}/content",
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=e.response.status_code, detail="Failed to get content")
+    except Exception as e:
+        logger.error(f"Get content error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get content")
+
+@app.get("/documents/{document_id}/entities")
+async def get_document_entities(document_id: str):
+    """Get entities from a specific document"""
+    try:
+        if DATABASE_AVAILABLE:
+            conn = db.get_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute(
+                "SELECT * FROM document_entities WHERE document_id = %s",
+                (document_id,)
+            )
+            entities = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return {"entities": entities, "document_id": document_id}
+        else:
+            return {"entities": [], "document_id": document_id}
+    except Exception as e:
+        logger.error(f"Error fetching document entities: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get entities")
+
+@app.post("/documents/search")
+async def search_documents(request: Request):
+    """Search documents"""
+    try:
+        body = await request.json()
+        query = body.get("query", "")
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"http://{DOCUMENT_INGESTION_SERVICE}/documents/search",
+                json=body,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"Search error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Search failed")
 
 @app.api_route("/documents/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def route_document_requests(request: Request, path: str):
@@ -1907,6 +2039,227 @@ Be analytical, precise, and insightful. Always ground your answers in the actual
         logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail="Chat service error")
 
+# Chat session endpoints
+@app.get("/chat/sessions")
+async def get_chat_sessions(request: Request):
+    """Get chat sessions for the user"""
+    try:
+        user_id = request.state.user_id if hasattr(request.state, 'user_id') else 'anonymous'
+        # For now, return mock data - can be connected to database later
+        return {
+            "sessions": [
+                {
+                    "id": "session_1",
+                    "title": "Invoice Analysis",
+                    "created": datetime.utcnow().isoformat(),
+                    "updated": datetime.utcnow().isoformat(),
+                    "messageCount": 5
+                }
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Get sessions error: {str(e)}")
+        return {"sessions": []}
+
+@app.post("/chat/sessions")
+async def create_chat_session(request: Request):
+    """Create a new chat session"""
+    try:
+        body = await request.json()
+        title = body.get("title", "New Chat")
+        session_id = f"session_{datetime.utcnow().timestamp()}"
+        
+        return {
+            "id": session_id,
+            "title": title,
+            "created": datetime.utcnow().isoformat(),
+            "updated": datetime.utcnow().isoformat(),
+            "messageCount": 0
+        }
+    except Exception as e:
+        logger.error(f"Create session error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create session")
+
+@app.get("/chat/sessions/{session_id}/messages")
+async def get_session_messages(session_id: str):
+    """Get messages from a chat session"""
+    try:
+        # Mock data - can be connected to database later
+        return {
+            "messages": []
+        }
+    except Exception as e:
+        logger.error(f"Get session messages error: {str(e)}")
+        return {"messages": []}
+
+@app.delete("/chat/sessions/{session_id}")
+async def delete_chat_session(session_id: str):
+    """Delete a chat session"""
+    try:
+        return {"message": "Session deleted", "id": session_id}
+    except Exception as e:
+        logger.error(f"Delete session error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete session")
+
+# Workflow endpoints
+@app.get("/workflows")
+async def get_workflows(request: Request):
+    """Get all workflows"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "http://batch-processor:8007/workflows",
+                timeout=10.0
+            )
+            return response.json()
+    except Exception as e:
+        logger.error(f"Get workflows error: {str(e)}")
+        return {"workflows": []}
+
+@app.get("/workflows/{workflow_id}")
+async def get_workflow(workflow_id: str):
+    """Get a specific workflow"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"http://batch-processor:8007/workflows/{workflow_id}",
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+        raise HTTPException(status_code=e.response.status_code, detail="Failed to get workflow")
+    except Exception as e:
+        logger.error(f"Get workflow error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get workflow")
+
+@app.post("/workflows")
+async def create_workflow(request: Request):
+    """Create a new workflow"""
+    try:
+        body = await request.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "http://batch-processor:8007/workflows",
+                json=body,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"Create workflow error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create workflow")
+
+@app.put("/workflows/{workflow_id}")
+async def update_workflow(workflow_id: str, request: Request):
+    """Update a workflow"""
+    try:
+        body = await request.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                f"http://batch-processor:8007/workflows/{workflow_id}",
+                json=body,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+        raise HTTPException(status_code=e.response.status_code, detail="Failed to update workflow")
+    except Exception as e:
+        logger.error(f"Update workflow error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update workflow")
+
+@app.delete("/workflows/{workflow_id}")
+async def delete_workflow(workflow_id: str):
+    """Delete a workflow"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(
+                f"http://batch-processor:8007/workflows/{workflow_id}",
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return {"message": "Workflow deleted", "id": workflow_id}
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+        raise HTTPException(status_code=e.response.status_code, detail="Failed to delete workflow")
+    except Exception as e:
+        logger.error(f"Delete workflow error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete workflow")
+
+@app.post("/workflows/{workflow_id}/activate")
+async def activate_workflow(workflow_id: str):
+    """Activate a workflow"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"http://batch-processor:8007/workflows/{workflow_id}/activate",
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+        raise HTTPException(status_code=e.response.status_code, detail="Failed to activate workflow")
+    except Exception as e:
+        logger.error(f"Activate workflow error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to activate workflow")
+
+@app.post("/workflows/{workflow_id}/pause")
+async def pause_workflow(workflow_id: str):
+    """Pause a workflow"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"http://batch-processor:8007/workflows/{workflow_id}/pause",
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+        raise HTTPException(status_code=e.response.status_code, detail="Failed to pause workflow")
+    except Exception as e:
+        logger.error(f"Pause workflow error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to pause workflow")
+
+@app.get("/workflows/{workflow_id}/executions")
+async def get_workflow_executions(workflow_id: str):
+    """Get workflow executions"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"http://batch-processor:8007/workflows/{workflow_id}/executions",
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"Get executions error: {str(e)}")
+        return {"executions": []}
+
+@app.get("/workflows/{workflow_id}/stats")
+async def get_workflow_stats(workflow_id: str):
+    """Get workflow statistics"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"http://batch-processor:8007/workflows/{workflow_id}/stats",
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"Get workflow stats error: {str(e)}")
+        return {"total_executions": 0, "successful": 0, "failed": 0}
+
 @app.api_route("/chat/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def route_chat_requests(request: Request, path: str):
     """Route requests to AI chat service"""
@@ -2134,15 +2487,33 @@ async def create_api_key(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api-keys")
-async def list_api_keys(user: User = Depends(get_current_user)):
+async def list_api_keys(request: Request):
     """List user's API keys"""
     try:
+        environment = os.getenv("ENVIRONMENT", "development")
+        if environment == "development":
+            # Return mock data for development
+            return {
+                "api_keys": [
+                    {
+                        "id": "key_1",
+                        "name": "Development Key",
+                        "prefix": "dk_",
+                        "created_at": datetime.utcnow().isoformat(),
+                        "last_used": None,
+                        "expires_at": None
+                    }
+                ]
+            }
+        
+        # Production mode - require auth
+        user = await get_current_user(request)
         api_keys = await get_user_api_keys(user.user_id)
         return {"api_keys": [key.dict() for key in api_keys]}
         
     except Exception as e:
         logger.error(f"Error listing API keys: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return {"api_keys": []}
 
 @app.delete("/api-keys/{key_id}")
 async def revoke_api_key(key_id: str, user: User = Depends(get_current_user)):
