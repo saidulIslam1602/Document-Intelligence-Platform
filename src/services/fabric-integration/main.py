@@ -15,8 +15,39 @@ from pydantic import BaseModel, Field
 
 from src.shared.config.settings import config_manager
 from src.shared.auth.auth_service import auth_service, User
-from .onelake_connector import OneLakeConnector, OneLakeItem, OneLakeWorkspace
-from .fabric_warehouse import FabricWarehouseService, WarehouseInfo, QueryResult
+
+# Pydantic models must be defined before imports
+class OneLakeWorkspace(BaseModel):
+    id: str
+    name: str
+    type: str = "workspace"
+
+class OneLakeItem(BaseModel):
+    id: str
+    name: str
+    type: str
+
+class WarehouseInfo(BaseModel):
+    name: str
+    id: str
+    status: str = "active"
+
+class QueryResult(BaseModel):
+    rows: List[Dict[str, Any]] = []
+    columns: List[str] = []
+
+try:
+    from onelake_connector import OneLakeConnector
+    from fabric_warehouse import FabricWarehouseService
+    FABRIC_AVAILABLE = True
+except ImportError:
+    FABRIC_AVAILABLE = False
+    class OneLakeConnector:
+        def __init__(self):
+            pass
+    class FabricWarehouseService:
+        def __init__(self):
+            pass
 
 # Initialize FastAPI app
 app = FastAPI(

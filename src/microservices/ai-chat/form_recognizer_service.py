@@ -523,9 +523,18 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 import json
-from azure.ai.formrecognizer import DocumentAnalysisClient
-from azure.core.credentials import AzureKeyCredential
-from azure.core.exceptions import ResourceNotFoundError, ServiceRequestError
+
+try:
+    from azure.ai.formrecognizer import DocumentAnalysisClient
+    from azure.core.credentials import AzureKeyCredential
+    from azure.core.exceptions import ResourceNotFoundError, ServiceRequestError
+    FORM_RECOGNIZER_AVAILABLE = True
+except ImportError:
+    FORM_RECOGNIZER_AVAILABLE = False
+    DocumentAnalysisClient = None
+    AzureKeyCredential = None
+    ResourceNotFoundError = Exception
+    ServiceRequestError = Exception
 
 from src.shared.config.settings import config_manager
 from src.shared.events.event_sourcing import DomainEvent, EventType, EventBus
@@ -539,11 +548,15 @@ class FormRecognizerService:
         self.event_bus = event_bus
         self.logger = logging.getLogger(__name__)
         
-        # Initialize Form Recognizer client
-        self.client = DocumentAnalysisClient(
-            endpoint=self.config.form_recognizer_endpoint,
-            credential=AzureKeyCredential(self.config.form_recognizer_key)
-        )
+        # Initialize Form Recognizer client only if Azure is available
+        if FORM_RECOGNIZER_AVAILABLE and self.config.form_recognizer_endpoint and self.config.form_recognizer_key:
+            self.client = DocumentAnalysisClient(
+                endpoint=self.config.form_recognizer_endpoint,
+                credential=AzureKeyCredential(self.config.form_recognizer_key)
+            )
+        else:
+            self.client = None
+            self.logger.warning("Form Recognizer not available - running in local mode")
         
         # Supported document types and their models
         self.document_models = {

@@ -455,12 +455,29 @@ Module: SQL Service - Database Abstraction Layer
 Database: Azure SQL Database
 """
 
-import pyodbc
+import os
 import logging
 import asyncio
 from typing import List, Dict, Any, Optional
 from contextlib import contextmanager, asynccontextmanager
-from .connection_pool import connection_pool
+
+# Try to import both database drivers
+try:
+    import pyodbc
+    PYODBC_AVAILABLE = True
+except ImportError:
+    PYODBC_AVAILABLE = False
+
+try:
+    import psycopg2
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    PSYCOPG2_AVAILABLE = False
+
+try:
+    from .connection_pool import connection_pool
+except ImportError:
+    connection_pool = None
 
 class SQLService:
     """
@@ -495,22 +512,46 @@ class SQLService:
         self.logger = logging.getLogger(__name__)
         self.enabled = bool(connection_string and connection_string.strip())
         
-        if not self.enabled:
+        # Check if we should use PostgreSQL (local development)
+        postgres_host = os.getenv('POSTGRES_HOST', '')
+        postgres_port = os.getenv('POSTGRES_PORT', '5432')
+        postgres_db = os.getenv('POSTGRES_DB', '')
+        postgres_user = os.getenv('POSTGRES_USER', '')
+        postgres_password = os.getenv('POSTGRES_PASSWORD', '')
+        
+        self.use_postgres = bool(postgres_host and postgres_db and PSYCOPG2_AVAILABLE)
+        
+        if self.use_postgres:
+            self.postgres_config = {
+                'host': postgres_host,
+                'port': int(postgres_port),
+                'database': postgres_db,
+                'user': postgres_user,
+                'password': postgres_password
+            }
+            self.logger.info(f"SQL Service initialized with PostgreSQL ({postgres_host}:{postgres_port}/{postgres_db})")
+        elif not self.enabled:
             self.logger.info("SQL Service disabled (no connection string provided)")
+        elif not PYODBC_AVAILABLE:
+            self.logger.warning("SQL Service configured but pyodbc not available")
+            self.enabled = False
         else:
-            self.logger.info("SQL Service initialized")
+            self.logger.info("SQL Service initialized with SQL Server")
     
     @contextmanager
     def get_connection(self):
         """Context manager for database connections"""
-        if not self.enabled:
+        if not self.enabled and not self.use_postgres:
             self.logger.debug("SQL Service not enabled, returning None connection")
             yield None
             return
         
         conn = None
         try:
-            conn = pyodbc.connect(self.connection_string)
+            if self.use_postgres:
+                conn = psycopg2.connect(**self.postgres_config, connect_timeout=5)
+            else:
+                conn = pyodbc.connect(self.connection_string)
             yield conn
         except Exception as e:
             self.logger.error(f"Database connection error: {str(e)}")
@@ -527,6 +568,16 @@ class SQLService:
     
     def create_tables(self):
         """Create necessary tables for the application"""
+        # Skip table creation for PostgreSQL (tables already exist)
+        if self.use_postgres:
+            self.logger.info("Skipping table creation for PostgreSQL (using existing schema)")
+            return
+        
+        # SQL Server table creation
+        if not self.enabled:
+            self.logger.info("SQL Service not enabled, skipping table creation")
+            return
+        
         create_tables_sql = """
         -- Users table
         IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
@@ -714,9 +765,47 @@ class SQLService:
             self.logger.error(f"Failed to create tables: {str(e)}")
             raise
     
+    def _translate_query_for_postgres(self, query: str, params: tuple) -> tuple:
+        """Translate SQL Server query syntax to PostgreSQL"""
+        if not self.use_postgres:
+            return query, params
+        
+        import re
+        
+        # Replace ? placeholders with $1, $2, etc for PostgreSQL
+        param_count = query.count('?')
+        for i in range(param_count, 0, -1):
+            query = query.replace('?', f'${i}', 1)
+        
+        # Reverse to get correct order
+        for i in range(1, param_count + 1):
+            query = query.replace(f'${param_count - i + 1}', f'${i}', 1)
+        
+        # Replace SQL Server specific functions with PostgreSQL equivalents
+        replacements = {
+            'GETUTCDATE()': 'NOW() AT TIME ZONE \'UTC\'',
+            'DATEADD(hour,': 'NOW() AT TIME ZONE \'UTC\' - INTERVAL \'',
+            'NEWID()': 'gen_random_uuid()',
+            'DATETIME2': 'TIMESTAMP',
+            'NVARCHAR': 'VARCHAR',
+            'BIT': 'BOOLEAN',
+        }
+        
+        for old, new in replacements.items():
+            query = query.replace(old, new)
+        
+        # Fix DATEADD translations
+        query = re.sub(r"NOW\(\) AT TIME ZONE 'UTC' - INTERVAL '(-?\d+), NOW\(\) AT TIME ZONE 'UTC'\)", 
+                      r"NOW() AT TIME ZONE 'UTC' - INTERVAL '\1 hours'", query)
+        
+        return query, params
+    
     def execute_query(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
         """Execute a SELECT query and return results"""
         try:
+            # Translate query for PostgreSQL if needed
+            query, params = self._translate_query_for_postgres(query, params)
+            
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(query, params)
@@ -735,6 +824,9 @@ class SQLService:
     def execute_non_query(self, query: str, params: tuple = ()) -> int:
         """Execute an INSERT/UPDATE/DELETE query and return affected rows"""
         try:
+            # Translate query for PostgreSQL if needed
+            query, params = self._translate_query_for_postgres(query, params)
+            
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(query, params)
@@ -974,6 +1066,11 @@ class SQLService:
     
     def get_metrics(self, metric_name: str = None, hours: int = 24) -> List[Dict[str, Any]]:
         """Get analytics metrics"""
+        # Skip if using PostgreSQL (table doesn't exist yet)
+        if self.use_postgres:
+            self.logger.info("Metrics not yet implemented for PostgreSQL")
+            return []
+        
         if metric_name:
             query = """
             SELECT metric_name, metric_value, metric_timestamp, metadata

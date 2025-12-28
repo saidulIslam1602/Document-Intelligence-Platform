@@ -10,11 +10,39 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from enum import Enum
 
-from lineage_tracker import (
-    lineage_tracker, AssetRegistrationRequest, LineageRelationshipRequest, 
-    AssetSearchRequest, DataAssetType, LineageType
-)
+# Pydantic models for requests
+class DataAssetType(str, Enum):
+    TABLE = "table"
+    VIEW = "view"
+    PROCEDURE = "procedure"
+    PIPELINE = "pipeline"
+
+class LineageType(str, Enum):
+    DERIVED_FROM = "derived_from"
+    FEEDS_INTO = "feeds_into"
+    DEPENDS_ON = "depends_on"
+
+class AssetRegistrationRequest(BaseModel):
+    name: str
+    type: DataAssetType
+    metadata: Dict[str, Any] = {}
+
+class LineageRelationshipRequest(BaseModel):
+    source: str
+    target: str
+    type: LineageType
+
+class AssetSearchRequest(BaseModel):
+    query: str
+    type: Optional[DataAssetType] = None
+
+try:
+    from lineage_tracker import lineage_tracker
+except ImportError:
+    lineage_tracker = None
+
 from src.shared.config.settings import config_manager
 from src.shared.storage.sql_service import SQLService
 from src.shared.cache.redis_cache import cache_service, cache_result

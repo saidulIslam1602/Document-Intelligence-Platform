@@ -515,12 +515,30 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 import pandas as pd
 import numpy as np
-from azure.servicebus import ServiceBusClient, ServiceBusMessage
-from azure.monitor.query import MetricsQueryClient
-from azure.identity import DefaultAzureCredential
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.utils import PlotlyJSONEncoder
+
+# Azure imports - optional for local development
+try:
+    from azure.servicebus import ServiceBusClient, ServiceBusMessage
+    from azure.monitor.query import MetricsQueryClient
+    from azure.identity import DefaultAzureCredential
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    ServiceBusClient = None
+    ServiceBusMessage = None
+    MetricsQueryClient = None
+    DefaultAzureCredential = None
+
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+    from plotly.utils import PlotlyJSONEncoder
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    go = None
+    px = None
+    PlotlyJSONEncoder = None
 
 from src.shared.config.settings import config_manager
 from src.shared.events.event_sourcing import EventBus
@@ -561,13 +579,16 @@ sql_service = SQLService(config.sql_connection_string)
 event_bus = EventBus()
 logger = logging.getLogger(__name__)
 
-# Azure clients
-service_bus_client = ServiceBusClient.from_connection_string(
-    config.service_bus_connection_string
-)
-
-# Metrics client for Azure Monitor
-metrics_client = MetricsQueryClient(DefaultAzureCredential())
+# Azure clients - only if Azure is available
+if AZURE_AVAILABLE and hasattr(config, 'service_bus_connection_string') and config.service_bus_connection_string:
+    service_bus_client = ServiceBusClient.from_connection_string(
+        config.service_bus_connection_string
+    )
+    metrics_client = MetricsQueryClient(DefaultAzureCredential())
+else:
+    service_bus_client = None
+    metrics_client = None
+    logger.warning("Azure Service Bus and Metrics not available - running in local mode")
 
 # Initialize automation scoring engine
 automation_engine = AutomationScoringEngine(sql_service)

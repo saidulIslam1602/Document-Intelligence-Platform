@@ -15,7 +15,17 @@ from pydantic import BaseModel, Field
 
 from src.shared.config.settings import config_manager
 from src.shared.auth.auth_service import auth_service, User
-from .poc_generator import PoCGenerator, PoCInstance, PoCScenario
+
+try:
+    from poc_generator import PoCGenerator, PoCInstance, PoCScenario
+except ImportError:
+    # Stub classes for when poc_generator is not available
+    class PoCGenerator:
+        pass
+    class PoCInstance:
+        pass
+    class PoCScenario:
+        pass
 
 # Initialize FastAPI app
 app = FastAPI(

@@ -440,6 +440,10 @@ class QualityMetricsRequest(BaseModel):
     table_name: str
     sample_size: int = Field(default=1000, ge=100, le=10000)
 
+class ValidationRequest(BaseModel):
+    table_name: str
+    data: Dict[str, Any]
+
 class ValidationRuleRequest(BaseModel):
     table_name: str
     field_name: str

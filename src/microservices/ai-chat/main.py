@@ -463,10 +463,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 import json
-from azure.storage.blob import BlobServiceClient
-from azure.search.documents import SearchClient
-from azure.search.documents.models import VectorizedQuery
-from azure.core.credentials import AzureKeyCredential
+
+# Azure imports - optional for local development
+try:
+    from azure.storage.blob import BlobServiceClient
+    from azure.search.documents import SearchClient
+    from azure.search.documents.models import VectorizedQuery
+    from azure.core.credentials import AzureKeyCredential
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    BlobServiceClient = None
+    SearchClient = None
+    VectorizedQuery = None
+    AzureKeyCredential = None
 
 from src.shared.config.settings import config_manager
 from src.shared.storage.sql_service import SQLService
@@ -521,12 +531,17 @@ else:
 openai_service = OpenAIService()
 form_recognizer_service = FormRecognizerService()
 
-# Cognitive Search client
-search_client = SearchClient(
-    endpoint=config.cognitive_search_endpoint,
-    index_name="documents",
-    credential=AzureKeyCredential(config.cognitive_search_key)
-)
+# Cognitive Search client - optional
+if AZURE_AVAILABLE and config.cognitive_search_endpoint and config.cognitive_search_key:
+    from azure.core.credentials import AzureKeyCredential
+    search_client = SearchClient(
+        endpoint=config.cognitive_search_endpoint,
+        index_name="documents",
+        credential=AzureKeyCredential(config.cognitive_search_key)
+    )
+else:
+    search_client = None
+    logger.info("Cognitive Search not configured - running without search capabilities")
 
 # WebSocket connection manager
 class ConnectionManager:

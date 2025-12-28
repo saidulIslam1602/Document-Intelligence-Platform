@@ -284,7 +284,7 @@ async def get_cache_stats():
         logger.error(f"Error getting cache stats: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get cache stats")
 
-@app.get("/api/health")
+@app.get("/health")
 async def health_check():
     """Health check endpoint"""
     return {
@@ -293,6 +293,15 @@ async def health_check():
         "service": "performance-dashboard"
     }
 
+@app.get("/api/health")
+async def api_health_check():
+    """API health check endpoint (legacy)"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "performance-dashboard"
+    }
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8004)
+    uvicorn.run(app, host="0.0.0.0", port=8005)

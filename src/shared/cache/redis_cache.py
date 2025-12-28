@@ -3,6 +3,7 @@ Redis Caching Service
 High-performance caching for improved API response times
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -162,6 +163,9 @@ class RedisCacheService:
 def cache_result(ttl: int = 3600, key_prefix: str = ""):
     """Decorator to cache function results"""
     def decorator(func):
+        from functools import wraps
+        
+        @wraps(func)
         async def wrapper(*args, **kwargs):
             # Generate cache key
             cache_key = f"{key_prefix}:{func.__name__}:{hash(str(args) + str(kwargs))}"
@@ -184,6 +188,9 @@ def cache_result(ttl: int = 3600, key_prefix: str = ""):
 def cache_invalidate(pattern: str):
     """Decorator to invalidate cache on function execution"""
     def decorator(func):
+        from functools import wraps
+        
+        @wraps(func)
         async def wrapper(*args, **kwargs):
             # Execute function
             result = await func(*args, **kwargs) if asyncio.iscoroutinefunction(func) else func(*args, **kwargs)

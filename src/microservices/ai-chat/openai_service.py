@@ -498,10 +498,20 @@ from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 import numpy as np
 from openai import AzureOpenAI, OpenAI
-from azure.core.credentials import AzureKeyCredential
-from azure.search.documents import SearchClient
-from azure.search.documents.indexes import SearchIndexClient
-from azure.search.documents.models import VectorizedQuery
+
+try:
+    from azure.core.credentials import AzureKeyCredential
+    from azure.search.documents import SearchClient
+    from azure.search.documents.indexes import SearchIndexClient
+    from azure.search.documents.models import VectorizedQuery
+    AZURE_SEARCH_AVAILABLE = True
+except ImportError:
+    AZURE_SEARCH_AVAILABLE = False
+    AzureKeyCredential = None
+    SearchClient = None
+    SearchIndexClient = None
+    VectorizedQuery = None
+
 import os
 
 from src.shared.config.settings import config_manager

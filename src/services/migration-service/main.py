@@ -12,13 +12,36 @@ from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
-from azure.servicebus import ServiceBusClient, ServiceBusMessage
+
+try:
+    from azure.servicebus import ServiceBusClient, ServiceBusMessage
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    ServiceBusClient = None
+    ServiceBusMessage = None
 
 from src.shared.config.settings import config_manager
 from src.shared.auth.auth_service import auth_service, User
-from .teradata_migrator import TeradataMigrator, MigrationJob, MigrationStatus
-from .netezza_migrator import NetezzaMigrator
-from .schema_converter import SchemaConverter, DatabaseType
+
+try:
+    from teradata_migrator import TeradataMigrator, MigrationJob, MigrationStatus
+    from netezza_migrator import NetezzaMigrator
+    from schema_converter import SchemaConverter, DatabaseType
+except ImportError:
+    # Stub classes
+    class TeradataMigrator:
+        pass
+    class MigrationJob:
+        pass
+    class MigrationStatus:
+        pass
+    class NetezzaMigrator:
+        pass
+    class SchemaConverter:
+        pass
+    class DatabaseType:
+        pass
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -49,9 +72,13 @@ netezza_migrator = NetezzaMigrator()
 schema_converter = SchemaConverter()
 
 # Azure clients
-service_bus_client = ServiceBusClient.from_connection_string(
-    config.service_bus_connection_string
-)
+if AZURE_AVAILABLE and hasattr(config, 'service_bus_connection_string') and config.service_bus_connection_string:
+    service_bus_client = ServiceBusClient.from_connection_string(
+        config.service_bus_connection_string
+    )
+else:
+    service_bus_client = None
+    logger.warning("Service Bus not configured - running without messaging capabilities")
 
 # Pydantic models
 class MigrationRequest(BaseModel):
